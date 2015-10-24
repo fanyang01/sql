@@ -7,6 +7,11 @@
 #define ALLOC_ATOM_LEN 16
 #define ALLOC_FLT_LEN (ALLOC_FLT_SIZE * sizeof(handle_t))
 
+#define CTBLK_MAXSHORT 254
+#define CTBLK_MAXLONG 65533
+#define CTBLK_FLAG_SHORT 0x1
+#define CTBLK_FLAG_LONG 0x2
+
 typedef uint64_t handle_t;
 typedef struct {
 	int fd;
