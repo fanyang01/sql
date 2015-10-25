@@ -18,6 +18,7 @@ static int flt_idx(handle_t size);
 static off_t hdl2off(handle_t handle);
 static handle_t off2hdl(off_t offset);
 static handle_t byte2hdl(void *buf);
+static void hdl2byte(handle_t h, void *buf);
 static handle_t read_handle(int fd, off_t offset);
 static int write_handle(int fd, handle_t h, off_t offset);
 static uint16_t byte2s(void *buf);
@@ -123,12 +124,14 @@ void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len)
 {
 	if (handle == 0)
 		return NULL;
-	off_t offset = hdl2off(handle);
+	off_t offset;
 	size_t need;
-	unsigned char bytes[3];
-	int newbuf = 0;
+	unsigned char bytes[ALLOC_ATOM_LEN];
+	int newbuf = 0, redirect = 0;
 
-	if (readat(a->fd, bytes, 3, offset) != 3)
+ Retry:
+	offset = hdl2off(handle);
+	if (readat(a->fd, bytes, 8, offset) != 8)
 		return NULL;
 	switch (bytes[0]) {
 	case CTBLK_FLAG_SHORT:
@@ -139,6 +142,12 @@ void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len)
 		need = (size_t) byte2s(&bytes[1]);
 		offset += 3;
 		break;
+	case REBLK_FLAG:
+		if (redirect)	// allow redirect only once
+			return NULL;
+		handle = byte2hdl(&bytes[1]);
+		redirect = 1;
+		goto Retry;
 	default:
 		return NULL;
 	}
@@ -157,14 +166,18 @@ void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len)
 }
 
 // TODO: merge adjacent free blocks.
+// TODO: create file holes for large free block
 int dealloc_blk(ALLOC * a, handle_t handle)
 {
-	off_t offset = hdl2off(handle);
+	off_t offset;
 	size_t len;
-	handle_t atoms;
-	unsigned char bytes[3];
+	handle_t redirect, atoms;
+	int redirected = 0;
+	unsigned char bytes[8];
 
-	if (readat(a->fd, bytes, 3, offset) != 3)
+ Retry:
+	offset = hdl2off(handle);
+	if (readat(a->fd, bytes, 8, offset) != 8)
 		return -1;
 	switch (bytes[0]) {
 	case CTBLK_FLAG_SHORT:
@@ -173,17 +186,91 @@ int dealloc_blk(ALLOC * a, handle_t handle)
 	case CTBLK_FLAG_LONG:
 		len = (size_t) byte2s(&bytes[1]);
 		break;
+	case REBLK_FLAG:
+		if (redirected)	// allow only once redirect
+			return -1;
+		redirect = byte2hdl(&bytes[1]);
+		if (hdl2off(handle + 1) >= fsize(a->fd)) {
+			if (ftruncate(a->fd, offset) == -1)
+				return -1;
+		} else {
+			if (free_blk(a, handle, 1) != 0)
+				return -1;
+		}
+		handle = redirect;
+		redirected = 1;
+		goto Retry;
 	default:
 		return -1;
 	}
 	atoms = len2atom(len);
-	if (hdl2off(handle + atoms) >= fsize(a->fd))
-		return ftruncate(a->fd, offset);
 	return free_blk(a, handle, atoms);
+}
+
+int realloc_blk(ALLOC * a, handle_t handle, void *buf, size_t len)
+{
+	off_t offset;
+	size_t olen;
+	handle_t prev_handle = 0, new_handle, old_atoms, new_atoms;
+	int redirected = 0;
+	unsigned char bytes[16];
+
+ Retry:
+	offset = hdl2off(handle);
+	if (readat(a->fd, bytes, 8, offset) != 8)
+		return -1;
+	switch (bytes[0]) {
+	case CTBLK_FLAG_SHORT:
+		olen = (size_t) bytes[1];
+		break;
+	case CTBLK_FLAG_LONG:
+		olen = (size_t) byte2s(&bytes[1]);
+		break;
+	case REBLK_FLAG:
+		if (redirected)	// allow only once redirect
+			return -1;
+		prev_handle = handle;
+		handle = byte2hdl(&bytes[1]);
+		redirected = 1;
+		goto Retry;
+	default:
+		return -1;
+	}
+	old_atoms = len2atom(olen);
+	new_atoms = len2atom(len);
+	if (old_atoms == new_atoms)
+		return use_blk(a, handle, buf, len);
+	else if (old_atoms > new_atoms) {
+		handle_t h_free = handle + new_atoms;
+		if (free_blk(a, h_free, old_atoms - new_atoms) != 0)
+			return -1;
+		return use_blk(a, handle, buf, len);
+	}
+
+	if (prev_handle != 0) {
+		if (dealloc_blk(a, handle) != 0)
+			return -1;
+	} else {
+		if (old_atoms > 1)
+			if (free_blk(a, handle + 1, old_atoms - 1) != 0)
+				return -1;
+		prev_handle = handle;
+	}
+	if ((new_handle = alloc_blk(a, buf, len)) == 0)
+		return -1;
+	bytes[0] = REBLK_FLAG;
+	hdl2byte(new_handle, &bytes[1]);
+	bzero(&bytes[8], 8);
+	if (writeat(a->fd, bytes, 16, hdl2off(prev_handle)) != 16)
+		return -1;
+	return 0;
 }
 
 int free_blk(ALLOC * a, handle_t h, handle_t atoms)
 {
+	if (hdl2off(h + atoms) >= fsize(a->fd))
+		return ftruncate(a->fd, hdl2off(h));
+
 	unsigned char buf[16];
 	handle_t prev = 0, next;
 	int idx;
@@ -315,6 +402,14 @@ handle_t byte2hdl(void *buf)
 		handle |= *p;
 	}
 	return handle;
+}
+
+void hdl2byte(handle_t h, void *buf)
+{
+	unsigned char s[8], *p = buf;
+	*((uint64_t *) (&s[0])) = htobe64(h);
+	for (int i = 0; i < 7; i++)
+		*p++ = s[i];
 }
 
 handle_t read_handle(int fd, off_t offset)

@@ -89,6 +89,8 @@ typedef struct {
 extern ALLOC *new_allocator(int fd, int mode);
 /*
  * Allocate a block large enough and copy len bytes into it.
+ *
+ * CRUD: create
  */
 extern handle_t alloc_blk(ALLOC * a, void *buf, size_t len);
 /*
@@ -98,12 +100,19 @@ extern handle_t alloc_blk(ALLOC * a, void *buf, size_t len);
  * Callers should check whether buf == return value, and if not,
  * buf_put() MUST be called for the return value.
  * On return, *len is set to the length of block content in bytes.
+ *
+ * CRUD: read
  */
 extern void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len);
 /*
  * Deallocate a used block.
+ *
+ * CRUD: delete
  */
 extern int dealloc_blk(ALLOC * a, handle_t handle);
+/*
+ * CRUD: update
+ */
 extern int realloc_blk(ALLOC * a, handle_t handle, void *buf, size_t len);
 
 extern void *buf_get(ALLOC * a, size_t len);
