@@ -11,6 +11,9 @@
 #define CTBLK_MAXLONG 65533
 #define CTBLK_FLAG_SHORT 0x1
 #define CTBLK_FLAG_LONG 0x2
+#define REBLK_FLAG 0x4
+#define FRBLK_FLAG_SINGLE 0x8
+#define FRBLK_FLAG_LONG 0x10
 
 typedef uint64_t handle_t;
 typedef struct {
