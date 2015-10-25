@@ -1,3 +1,61 @@
+#ifndef _ALLOC_H
+#define _ALLOC_H
+
+/*
+ * handle: store as 7 bytes in NETWORK ORDER
+ * 
+ *
+ * FLT:
+ *
+ * - 14 slots, 8 bytes each slot
+ * - each slot is head of a double-linked list of free blocks whose
+ *   size in atoms are between [2^index, 2^(index+1))
+ * - except the last slot: [2^index, +inf)
+ *
+ *
+ * block type:
+ *
+ * - short content block
+ * - long content block
+ * - relocated used block
+ * - single-atom free block
+ * - long free block
+ *
+ * short content block
+ * ===================
+ * - 1st byte: 0x1
+ * - 2nd byte: length of content, [0, 254(0xFE)]
+ * - number of atoms: [1, 16]
+ *
+ * long content block
+ * ==================
+ * - 1st byte: 0x2
+ * - 2nd and 3rd bytes: length of content, [255(0xFF), 65533(0xFFFD)],
+ *   NETWORK ORDER
+ * - number of atoms: [17, 4096]
+ *
+ * relocated used block
+ * ====================
+ * - 1st byte: 0x4
+ * - 2...8 bytes: handle to a short or long content block
+ * - number of atoms: 1
+ *
+ * single-atom free block
+ * ======================
+ * - 1st byte: 0x8
+ * - 2...8 bytes: handle to previous free block
+ * - 9...15 bytes: handle to next free block
+ * - 16th byte: 0x8
+ * - number of atoms: 1
+ *
+ * long free block
+ * ===============
+ * - 1st byte: 0x10
+ * - 2...8 bytes: handle to previous free block
+ * - 9...15 bytes: handle to next free block
+ * - 16th byte: 0x10
+ * - 17...23 bytes: size of this block in atoms, [2, 2^56-1], NETWORK ORDER
+ */
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -26,3 +84,5 @@ extern handle_t alloc_blk(ALLOC * a, void *buf, size_t len);
 extern int dealloc_blk(ALLOC * a, handle_t handle);
 extern int realloc_blk(ALLOC * a, handle_t handle, void *buf, size_t len);
 extern void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t len);
+
+#endif

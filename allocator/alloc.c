@@ -27,61 +27,6 @@ static handle_t byte2hdl(void *buf);
 static handle_t read_handle(int fd, off_t offset);
 static int write_handle(int fd, handle_t h, off_t offset);
 
-/*
- * handle: store as 7 bytes in NETWORK ORDER
- * 
- *
- * FLT:
- *
- * - 14 slots, 8 bytes each slot
- * - each slot is head of a double-linked list of free blocks whose
- *   size in atoms are between [2^index, 2^(index+1))
- * - except the last slot: [2^index, +inf)
- *
- *
- * block type:
- *
- * - short content block
- * - long content block
- * - relocated used block
- * - single-atom free block
- * - long free block
- *
- * short content block
- * ===================
- * - 1st byte: 0x1
- * - 2nd byte: length of content, [0, 254(0xFE)]
- * - number of atoms: [1, 16]
- *
- * long content block
- * ==================
- * - 1st byte: 0x2
- * - 2nd and 3rd bytes: length of content, [255(0xFF), 65533(0xFFFD)],
- *   NETWORK ORDER
- * - number of atoms: [17, 4096]
- *
- * relocated used block
- * ====================
- * - 1st byte: 0x4
- * - 2...8 bytes: handle to a short or long content block
- * - number of atoms: 1
- *
- * single-atom free block
- * ======================
- * - 1st byte: 0x8
- * - 2...8 bytes: handle to previous free block
- * - 9...15 bytes: handle to next free block
- * - 16th byte: 0x8
- * - number of atoms: 1
- *
- * long free block
- * ===============
- * - 1st byte: 0x10
- * - 2...8 bytes: handle to previous free block
- * - 9...15 bytes: handle to next free block
- * - 16th byte: 0x10
- * - 17...23 bytes: size of this block in atoms, [2, 2^56-1], NETWORK ORDER
- */
 ALLOC *new_allocator(int fd, int mode)
 {
 	ALLOC *allocator;
@@ -174,6 +119,8 @@ handle_t alloc_blk(ALLOC * a, void *buf, size_t len)
 		if (free_blk(a, h_free, atoms_free) != 0)
 			return 0;
 	}
+	if (alloc(a->fd, hdl2off(h), req * ALLOC_ATOM_LEN) == -1)
+		return 0;
 	if (use_blk(a, h, buf, len) != 0)
 		return 0;
 	return h;
