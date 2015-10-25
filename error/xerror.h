@@ -8,6 +8,12 @@
 extern int *_errno_value(void);
 #define xerrno (*_errno_value())
 
+#define preserve_errno(stmt) do { \
+	int _err = errno, _xerr = xerrno; \
+	stmt; \
+	errno = _err; xerrno = _xerr; \
+} while(0)
+
 #define ERR_FSIZE 1		// Invalid file size
 #define ERR_READLESS 2		// Read less than expected length
 #define ERR_BLKSIZE 3		// Wrong block size

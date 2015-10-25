@@ -1,16 +1,9 @@
 #include "file.h"
 #include "alloc.h"
-#include <errno.h>
+#include "xerror.h"
 #include <sys/stat.h>
 #include <string.h>
 #include <arpa/inet.h>
-
-#define preserve_errno(stmt) do { \
-	int _err = errno; stmt; errno = _err; \
-} while(0)
-
-extern void *buf_get(ALLOC * a, size_t len);
-extern void buf_put(ALLOC * a, void *p);
 
 static int free_blk(ALLOC * a, handle_t h, handle_t atoms);
 static int use_blk(ALLOC * a, handle_t h, void *buf, size_t len);
@@ -26,6 +19,7 @@ static handle_t off2hdl(off_t offset);
 static handle_t byte2hdl(void *buf);
 static handle_t read_handle(int fd, off_t offset);
 static int write_handle(int fd, handle_t h, off_t offset);
+static uint16_t byte2s(void *buf);
 
 ALLOC *new_allocator(int fd, int mode)
 {
@@ -124,6 +118,43 @@ handle_t alloc_blk(ALLOC * a, void *buf, size_t len)
 	if (use_blk(a, h, buf, len) != 0)
 		return 0;
 	return h;
+}
+
+void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len)
+{
+	if (handle == 0)
+		return NULL;
+	off_t offset = hdl2off(handle);
+	size_t need;
+	unsigned char bytes[3];
+	int newbuf = 0;
+
+	if (readat(a->fd, bytes, 3, offset) != 3)
+		return NULL;
+	switch (bytes[0]) {
+	case CTBLK_FLAG_SHORT:
+		need = (size_t) bytes[1];
+		offset += 2;
+		break;
+	case CTBLK_FLAG_LONG:
+		need = (size_t) byte2s(&bytes[1]);
+		offset += 3;
+		break;
+	default:
+		return NULL;
+	}
+	*len = need;
+	if (need > *len) {
+		if ((buf = buf_get(a, need)) == NULL)
+			return NULL;
+		newbuf = 1;
+	}
+	if (readat(a->fd, buf, need, offset) != need) {
+		if (newbuf)
+			preserve_errno(buf_put(a, buf));
+		return NULL;
+	}
+	return buf;
 }
 
 int free_blk(ALLOC * a, handle_t h, handle_t atoms)
@@ -276,4 +307,14 @@ int write_handle(int fd, handle_t h, off_t offset)
 	if (writeat(fd, s, 7, offset) != 7)
 		return -1;
 	return 0;
+}
+
+uint16_t byte2s(void *buf)
+{
+	uint16_t i = 0;
+	unsigned char *p = buf;
+	i |= (uint16_t) * p++;
+	i <<= 8;
+	i |= *p;
+	return i;
 }
