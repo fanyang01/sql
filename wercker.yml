@@ -1,0 +1,8 @@
+box: gcc
+
+build:
+  steps:
+    - script:
+        name: test build
+        code: |
+			make testbuild
