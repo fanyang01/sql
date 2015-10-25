@@ -2,7 +2,9 @@
 #define _ALLOC_H
 
 /*
- * handle: store as 7 bytes in NETWORK ORDER
+ * handle:
+ * - store as 7 bytes in NETWORK ORDER
+ * - zero value means NULL
  * 
  *
  * FLT:
@@ -79,10 +81,29 @@ typedef struct {
 	handle_t flt[ALLOC_FLT_SIZE];
 } ALLOC;
 
+/*
+ * Returns an allocator on file fd according to mode:
+ * if mode == ALLOC_M_OPEN, open an exist allocator;
+ * if mode == ALLOC_M_NEW, create a new allocator.
+ */
 extern ALLOC *new_allocator(int fd, int mode);
+/*
+ * Allocate a block large enough and copy len bytes into it.
+ */
 extern handle_t alloc_blk(ALLOC * a, void *buf, size_t len);
+/*
+ * Read the entire block content referenced by handle.
+ * If buf is not large enough to place the content, a new buffer is
+ * allocated and be returned.
+ * Callers should check whether buf == return value, and if not,
+ * buf_put() MUST be called for the return value.
+ * On return, *len is set to the length of block content in bytes.
+ */
+extern void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len);
 extern int dealloc_blk(ALLOC * a, handle_t handle);
 extern int realloc_blk(ALLOC * a, handle_t handle, void *buf, size_t len);
-extern void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t len);
+
+extern void *buf_get(ALLOC * a, size_t len);
+extern void buf_put(ALLOC * a, void *p);
 
 #endif
