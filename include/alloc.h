@@ -100,6 +100,9 @@ extern handle_t alloc_blk(ALLOC * a, void *buf, size_t len);
  * On return, *len is set to the length of block content in bytes.
  */
 extern void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len);
+/*
+ * Deallocate a used block.
+ */
 extern int dealloc_blk(ALLOC * a, handle_t handle);
 extern int realloc_blk(ALLOC * a, handle_t handle, void *buf, size_t len);
 

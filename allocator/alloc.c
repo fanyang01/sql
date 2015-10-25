@@ -3,6 +3,7 @@
 #include "xerror.h"
 #include <sys/stat.h>
 #include <string.h>
+#include <strings.h>
 #include <arpa/inet.h>
 
 static int free_blk(ALLOC * a, handle_t h, handle_t atoms);
@@ -68,8 +69,6 @@ handle_t alloc_blk(ALLOC * a, void *buf, size_t len)
 		return 0;
 	if ((h = flt_find(a, req, &idx)) == 0) {	// no free blocks
 		off_t tail = fsize(a->fd);
-		off_t need = len_need(len);
-		unsigned char *b;
 
 		if (tail <= 0)
 			return 0;
@@ -157,6 +156,32 @@ void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len)
 	return buf;
 }
 
+// TODO: merge adjacent free blocks.
+int dealloc_blk(ALLOC * a, handle_t handle)
+{
+	off_t offset = hdl2off(handle);
+	size_t len;
+	handle_t atoms;
+	unsigned char bytes[3];
+
+	if (readat(a->fd, bytes, 3, offset) != 3)
+		return -1;
+	switch (bytes[0]) {
+	case CTBLK_FLAG_SHORT:
+		len = (size_t) bytes[1];
+		break;
+	case CTBLK_FLAG_LONG:
+		len = (size_t) byte2s(&bytes[1]);
+		break;
+	default:
+		return -1;
+	}
+	atoms = len2atom(len);
+	if (hdl2off(handle + atoms) >= fsize(a->fd))
+		return ftruncate(a->fd, offset);
+	return free_blk(a, handle, atoms);
+}
+
 int free_blk(ALLOC * a, handle_t h, handle_t atoms)
 {
 	unsigned char buf[16];
@@ -187,21 +212,24 @@ int free_blk(ALLOC * a, handle_t h, handle_t atoms)
 int use_blk(ALLOC * a, handle_t h, void *buf, size_t len)
 {
 	size_t need = len_need(len);
+	size_t padding = len2atom(len) * ALLOC_ATOM_LEN - need;
 	unsigned char *b;
 
-	if ((b = buf_get(a, need)) == NULL)
+	if ((b = buf_get(a, need + padding)) == NULL)
 		return -1;
 
 	if (len <= CTBLK_MAXSHORT) {
 		b[0] = CTBLK_FLAG_SHORT;
 		b[1] = (unsigned char)len;
 		memcpy(&b[2], buf, len);
+		bzero(&b[2 + len], padding);
 	} else {
 		b[0] = CTBLK_FLAG_LONG;
 		*((uint16_t *) (&b[1])) = htons((uint16_t) len);
 		memcpy(&b[3], buf, len);
+		bzero(&b[3 + len], padding);
 	}
-	if (writeat(a->fd, b, need, hdl2off(h)) != need) {
+	if (writeat(a->fd, b, need + padding, hdl2off(h)) != need + padding) {
 		preserve_errno(buf_put(a, b));
 		return -1;
 	}
@@ -257,10 +285,10 @@ handle_t len2atom(size_t len)
 	return (len_need(len) - 1) / ALLOC_ATOM_LEN + 1;
 }
 
-int flt_idx(handle_t size)
+int flt_idx(handle_t atoms)
 {
 	int i = 0;
-	while ((size >>= 1) != 0)
+	while ((atoms >>= 1) != 0)
 		i++;
 	return i;
 }
