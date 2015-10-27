@@ -12,7 +12,7 @@ SUBDIRS := $(filter-out lib/, \
 all: echo subdirs lib
 
 echo:
-	echo $(SUBDIRS)
+	@echo subdirectory: $(SUBDIRS)
 
 .PHONY: subdirs $(SUBDIRS) copy testbuild lib
 
