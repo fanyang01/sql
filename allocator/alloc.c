@@ -64,7 +64,7 @@ handle_t alloc_blk(ALLOC * a, void *buf, size_t len)
 	if ((h = flt_find(a, req, &idx)) == 0) {	// no free blocks
 		off_t tail = fsize(a->fd);
 
-		if (tail <= 0)
+		if (tail <= 0 || tail % ALLOC_ATOM_LEN != 0)
 			return 0;
 		h = off2hdl(tail);
 		if (alloc(a->fd, tail, req * ALLOC_ATOM_LEN) == -1)

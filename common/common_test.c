@@ -16,5 +16,10 @@ int main(void)
 	hdl2byte(buf, h);
 	assert(h == byte2hdl(buf));
 
+	FILE *f = tmpfile();
+	assert(f != NULL);
+	int fd = fileno(f);
+	assert(write_handle(fd, h, 0) == 0);
+	assert(read_handle(fd, 0) == h);
 	return 0;
 }

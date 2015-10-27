@@ -5,13 +5,11 @@ BUILD_DIR=./build
 
 CC=gcc -Wall -I $(INCLUDE_DIR)
 
-SUBDIRS = $(basename $(shell find . -mindepth 2 -maxdepth 2 -name Makefile -printf '%h\n'))
+SUBDIRS := $(basename $(shell find . -mindepth 2 -maxdepth 2 -name Makefile -printf '%h\n'))
 
-all: subdirs testbuild
+all: subdirs
 
 .PHONY: subdirs $(SUBDIRS) copy testbuild build
-
-subdirs: $(SUBDIRS)
 
 copy:
 	find . -path $(INCLUDE_DIR) -prune -o -name \*.h -exec cp {} $(INCLUDE_DIR) \;
@@ -19,6 +17,8 @@ copy:
 
 testbuild: copy
 	find $(LIB_DIR) -name \*.c -exec $(CC) -c -o /dev/null {} \;
+
+subdirs: $(SUBDIRS)
 
 $(SUBDIRS): copy
 	@$(MAKE) -C $@

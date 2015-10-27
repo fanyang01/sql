@@ -62,10 +62,9 @@ handle_t read_handle(int fd, off_t offset)
 
 int write_handle(int fd, handle_t h, off_t offset)
 {
-	unsigned char s[8];
+	unsigned char s[7];
 
-	*((uint64_t *) (&s[0])) = htobe64(h);
-
+	hdl2byte(s, h);
 	if (writeat(fd, s, 7, offset) != 7)
 		return -1;
 	return 0;
