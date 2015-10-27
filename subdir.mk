@@ -1,4 +1,4 @@
-CC=gcc -I ../include -Wall -L../lib
+CC=gcc -I ../include -Wall -L../lib -lpthread
 SHELL=/bin/bash
 
 all: build test

@@ -1,5 +1,5 @@
 LIB=libsql.a
-CFLAGS = -I ../include -Wall
+CFLAGS = -I ../include -Wall -lpthread
 SRC_FILES := $(shell find . -name \*.c)
 OBJ_FILES = $(addsuffix .o, $(basename $(SRC_FILES)))
 

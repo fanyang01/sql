@@ -105,15 +105,15 @@ extern handle_t alloc_blk(ALLOC * a, void *buf, size_t len);
  */
 extern void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len);
 /*
+ * CRUD: update
+ */
+extern int realloc_blk(ALLOC * a, handle_t handle, void *buf, size_t len);
+/*
  * Deallocate a used block.
  *
  * CRUD: delete
  */
 extern int dealloc_blk(ALLOC * a, handle_t handle);
-/*
- * CRUD: update
- */
-extern int realloc_blk(ALLOC * a, handle_t handle, void *buf, size_t len);
 
 extern void *buf_get(ALLOC * a, size_t len);
 extern void buf_put(ALLOC * a, void *p);
