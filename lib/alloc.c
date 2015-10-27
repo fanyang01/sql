@@ -1,10 +1,10 @@
-#include "file.h"
 #include "alloc.h"
+#include "file.h"
 #include "xerror.h"
+#include "common.h"
 #include <sys/stat.h>
 #include <string.h>
 #include <strings.h>
-#include <arpa/inet.h>
 
 static int free_blk(ALLOC * a, handle_t h, handle_t atoms);
 static int use_blk(ALLOC * a, handle_t h, void *buf, size_t len);
@@ -15,13 +15,6 @@ static handle_t flt_find(ALLOC * a, handle_t req, int *idx);
 static size_t len_need(size_t len);
 static handle_t len2atom(size_t len);
 static int flt_idx(handle_t size);
-static off_t hdl2off(handle_t handle);
-static handle_t off2hdl(off_t offset);
-static handle_t byte2hdl(void *buf);
-static void hdl2byte(handle_t h, void *buf);
-static handle_t read_handle(int fd, off_t offset);
-static int write_handle(int fd, handle_t h, off_t offset);
-static uint16_t byte2s(void *buf);
 
 ALLOC *new_allocator(int fd, int mode)
 {
@@ -139,7 +132,7 @@ void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len)
 		offset += 2;
 		break;
 	case CTBLK_FLAG_LONG:
-		need = (size_t) byte2s(&bytes[1]);
+		need = (size_t) b2uint16(&bytes[1]);
 		offset += 3;
 		break;
 	case REBLK_FLAG:
@@ -184,7 +177,7 @@ int dealloc_blk(ALLOC * a, handle_t handle)
 		len = (size_t) bytes[1];
 		break;
 	case CTBLK_FLAG_LONG:
-		len = (size_t) byte2s(&bytes[1]);
+		len = (size_t) b2uint16(&bytes[1]);
 		break;
 	case REBLK_FLAG:
 		if (redirected)	// allow only once redirect
@@ -224,7 +217,7 @@ int realloc_blk(ALLOC * a, handle_t handle, void *buf, size_t len)
 		olen = (size_t) bytes[1];
 		break;
 	case CTBLK_FLAG_LONG:
-		olen = (size_t) byte2s(&bytes[1]);
+		olen = (size_t) b2uint16(&bytes[1]);
 		break;
 	case REBLK_FLAG:
 		if (redirected)	// allow only once redirect
@@ -259,7 +252,7 @@ int realloc_blk(ALLOC * a, handle_t handle, void *buf, size_t len)
 	if ((new_handle = alloc_blk(a, buf, len)) == 0)
 		return -1;
 	bytes[0] = REBLK_FLAG;
-	hdl2byte(new_handle, &bytes[1]);
+	hdl2byte(&bytes[1], new_handle);
 	bzero(&bytes[8], 8);
 	if (writeat(a->fd, bytes, 16, hdl2off(prev_handle)) != 16)
 		return -1;
@@ -312,7 +305,7 @@ int use_blk(ALLOC * a, handle_t h, void *buf, size_t len)
 		bzero(&b[2 + len], padding);
 	} else {
 		b[0] = CTBLK_FLAG_LONG;
-		*((uint16_t *) (&b[1])) = htons((uint16_t) len);
+		uint16tob(&b[1], len);
 		memcpy(&b[3], buf, len);
 		bzero(&b[3 + len], padding);
 	}
@@ -377,67 +370,5 @@ int flt_idx(handle_t atoms)
 	int i = 0;
 	while ((atoms >>= 1) != 0)
 		i++;
-	return i;
-}
-
-off_t hdl2off(handle_t handle)
-{
-	return ALLOC_FLT_LEN + (handle - 1) * ALLOC_ATOM_LEN;
-}
-
-handle_t off2hdl(off_t offset)
-{
-	if (offset < ALLOC_FLT_LEN)
-		return 0;
-	return (offset - ALLOC_FLT_LEN) / ALLOC_ATOM_LEN + 1;
-}
-
-handle_t byte2hdl(void *buf)
-{
-	unsigned char *p = buf;
-	uint64_t handle = 0;
-
-	for (int i = 0; i < 7; i++, p++) {
-		handle <<= 8;
-		handle |= *p;
-	}
-	return handle;
-}
-
-void hdl2byte(handle_t h, void *buf)
-{
-	unsigned char s[8], *p = buf;
-	*((uint64_t *) (&s[0])) = htobe64(h);
-	for (int i = 0; i < 7; i++)
-		*p++ = s[i];
-}
-
-handle_t read_handle(int fd, off_t offset)
-{
-	unsigned char s[7];
-
-	if (readat(fd, s, 7, offset) != 7)
-		return 0;
-	return byte2hdl(s);
-}
-
-int write_handle(int fd, handle_t h, off_t offset)
-{
-	unsigned char s[8];
-
-	*((uint64_t *) (&s[0])) = htobe64(h);
-
-	if (writeat(fd, s, 7, offset) != 7)
-		return -1;
-	return 0;
-}
-
-uint16_t byte2s(void *buf)
-{
-	uint16_t i = 0;
-	unsigned char *p = buf;
-	i |= (uint16_t) * p++;
-	i <<= 8;
-	i |= *p;
 	return i;
 }
