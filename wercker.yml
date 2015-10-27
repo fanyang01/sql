@@ -3,6 +3,7 @@ box: gcc
 build:
   steps:
     - script:
-        name: test build
+        name: test
         code: |
           make testbuild
+          make
