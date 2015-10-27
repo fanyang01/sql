@@ -1,7 +1,7 @@
 LIB=libsql.a
 CFLAGS = -I ../include -Wall -lpthread
-SRC_FILES := $(shell find . -name \*.c)
-OBJ_FILES = $(addsuffix .o, $(basename $(SRC_FILES)))
+SRC_FILES := $(wildcard *.c)
+OBJ_FILES := $(patsubst %.c, %.o, $(SRC_FILES))
 
 .PHONY: clean
 
