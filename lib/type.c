@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-void str2byte(void *buf, size_t fixlen, const char *s)
+void str2b(void *buf, size_t fixlen, const char *s)
 {
 	char *p = buf;
 	int i;
@@ -33,7 +33,7 @@ int32_t b2int32(void *buf)
 	return *((int32_t *) (&n));
 }
 
-void float2byte(void *buf, float f)
+void float2b(void *buf, float f)
 {
 	unsigned char *p = buf;
 	uint32_t u = *((uint32_t *) (&f));
@@ -42,7 +42,7 @@ void float2byte(void *buf, float f)
 		*p++ = (u >> ((3 - i) * 8)) & 0xFF;
 }
 
-float byte2float(void *buf)
+float b2float(void *buf)
 {
 	uint32_t n = 0;
 	unsigned char *p = buf;

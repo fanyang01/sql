@@ -20,7 +20,7 @@ void uint16tob(void *buf, uint16_t i)
 	p[1] = (unsigned char)(i & 0x00FF);
 }
 
-handle_t byte2hdl(void *buf)
+handle_t b2hdl(void *buf)
 {
 	unsigned char *p = buf;
 	uint64_t handle = 0;
@@ -32,7 +32,7 @@ handle_t byte2hdl(void *buf)
 	return handle;
 }
 
-void hdl2byte(void *buf, handle_t h)
+void hdl2b(void *buf, handle_t h)
 {
 	unsigned char *p = buf;
 	for (int i = 0; i < 7; i++)
@@ -57,14 +57,14 @@ handle_t read_handle(int fd, off_t offset)
 
 	if (readat(fd, s, 7, offset) != 7)
 		return 0;
-	return byte2hdl(s);
+	return b2hdl(s);
 }
 
 int write_handle(int fd, handle_t h, off_t offset)
 {
 	unsigned char s[7];
 
-	hdl2byte(s, h);
+	hdl2b(s, h);
 	if (writeat(fd, s, 7, offset) != 7)
 		return -1;
 	return 0;

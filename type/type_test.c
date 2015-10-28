@@ -8,7 +8,7 @@ int main(void)
 	unsigned char buf[16];
 	char s[] = "hello, world";
 
-	str2byte(buf, 16, s);
+	str2b(buf, 16, s);
 	assert(strncmp((char *)buf, s, sizeof(s)) == 0);
 	assert(buf[15] == 0);
 
@@ -20,8 +20,8 @@ int main(void)
 	assert(b2int32(buf) == i);
 
 	float f = 0.0625;
-	float2byte(buf, f);
-	assert(byte2float(buf) == f);
+	float2b(buf, f);
+	assert(b2float(buf) == f);
 
 	return 0;
 }

@@ -32,10 +32,13 @@
  */
 #define MAX_VARSTRLEN ((1<<16) - 1)
 
-extern void str2byte(void *buf, size_t fixlen, const char *s);
+extern void str2b(void *buf, size_t fixlen, const char *s);
 extern void int32tob(void *buf, int32_t i);
 extern int32_t b2int32(void *buf);
-extern void float2byte(void *buf, float f);
-extern float byte2float(void *buf);
+extern void float2b(void *buf, float f);
+extern float b2float(void *buf);
+extern void vstr2b(void *buf, const char *s);
+extern size_t vstrlen(void *buf);
+extern void b2vstr(void *buf, char *dst);
 
 #endif

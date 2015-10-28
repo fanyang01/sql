@@ -13,8 +13,8 @@ int main(void)
 	assert(i16 == 0x1234);
 
 	handle_t h = 0x34567890;
-	hdl2byte(buf, h);
-	assert(h == byte2hdl(buf));
+	hdl2b(buf, h);
+	assert(h == b2hdl(buf));
 
 	FILE *f = tmpfile();
 	assert(f != NULL);

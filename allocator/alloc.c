@@ -84,15 +84,15 @@ handle_t alloc_blk(ALLOC * a, void *buf, size_t len)
 	switch (tag) {
 	case FRBLK_FLAG_SINGLE:
 		atoms = 1;
-		prev = byte2hdl(&atom[1]);
-		next = byte2hdl(&atom[8]);
+		prev = b2hdl(&atom[1]);
+		next = b2hdl(&atom[8]);
 		// TODO: verify last byte
 		break;
 	case FRBLK_FLAG_LONG:
 		if ((atoms = read_handle(a->fd, hdl2off(h) + 16)) == 0)
 			return 0;
-		prev = byte2hdl(&atom[1]);
-		next = byte2hdl(&atom[8]);
+		prev = b2hdl(&atom[1]);
+		next = b2hdl(&atom[8]);
 		// TODO: verify last byte
 		break;
 	default:
@@ -138,7 +138,7 @@ void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len)
 	case REBLK_FLAG:
 		if (redirect)	// allow redirect only once
 			return NULL;
-		handle = byte2hdl(&bytes[1]);
+		handle = b2hdl(&bytes[1]);
 		redirect = 1;
 		goto Retry;
 	default:
@@ -182,7 +182,7 @@ int dealloc_blk(ALLOC * a, handle_t handle)
 	case REBLK_FLAG:
 		if (redirected)	// allow only once redirect
 			return -1;
-		redirect = byte2hdl(&bytes[1]);
+		redirect = b2hdl(&bytes[1]);
 		if (hdl2off(handle + 1) >= fsize(a->fd)) {
 			if (ftruncate(a->fd, offset) == -1)
 				return -1;
@@ -223,7 +223,7 @@ int realloc_blk(ALLOC * a, handle_t handle, void *buf, size_t len)
 		if (redirected)	// allow only once redirect
 			return -1;
 		prev_handle = handle;
-		handle = byte2hdl(&bytes[1]);
+		handle = b2hdl(&bytes[1]);
 		redirected = 1;
 		goto Retry;
 	default:
@@ -252,7 +252,7 @@ int realloc_blk(ALLOC * a, handle_t handle, void *buf, size_t len)
 	if ((new_handle = alloc_blk(a, buf, len)) == 0)
 		return -1;
 	bytes[0] = REBLK_FLAG;
-	hdl2byte(&bytes[1], new_handle);
+	hdl2b(&bytes[1], new_handle);
 	bzero(&bytes[8], 8);
 	if (writeat(a->fd, bytes, 16, hdl2off(prev_handle)) != 16)
 		return -1;
