@@ -13,11 +13,12 @@ uint16_t b2uint16(void *buf)
 	return i;
 }
 
-void uint16tob(void *buf, uint16_t i)
+void *uint16tob(void *buf, uint16_t i)
 {
 	unsigned char *p = buf;
-	p[0] = (unsigned char)(i >> 8);
-	p[1] = (unsigned char)(i & 0x00FF);
+	p[0] = (unsigned char)((i >> 8) & 0xFF);
+	p[1] = (unsigned char)(i & 0xFF);
+	return p + 2;
 }
 
 handle_t b2hdl(void *buf)
@@ -32,11 +33,12 @@ handle_t b2hdl(void *buf)
 	return handle;
 }
 
-void hdl2b(void *buf, handle_t h)
+void *hdl2b(void *buf, handle_t h)
 {
 	unsigned char *p = buf;
 	for (int i = 0; i < 7; i++)
 		*p++ = (h >> ((6 - i) * 8)) & 0xFF;
+	return p;
 }
 
 off_t hdl2off(handle_t handle)
