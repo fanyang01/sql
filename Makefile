@@ -9,10 +9,15 @@ SUBDIRS := $(filter-out lib/, \
 	$(dir \
 	$(shell find . -mindepth 2 -maxdepth 2 -name Makefile -printf '%P\n')))
 
-all: echo subdirs lib
+all: subdirs lib echo
 
 echo:
-	@echo subdirectory: $(SUBDIRS)
+	@echo
+	@echo SUMMARY:
+	@echo -e "\t" subdirectory: $(SUBDIRS)
+	@echo -e "\t" total $(shell find $(SUBDIRS) -name \*.[ch] | xargs cat | wc -l) \
+	   lines C code.	
+	@echo
 
 .PHONY: subdirs $(SUBDIRS) copy testbuild lib
 
