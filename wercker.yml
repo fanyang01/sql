@@ -1,16 +1,15 @@
 box: gcc
 
-dev:
+build:
     steps:
         - script:
             name: Install libbsd-dev
             code: |
-                apt-get update && apt-get install -y libbsd-dev
-
-build:
-  steps:
-    - script:
-        name: test
-        code: |
-          make testbuild
-          make
+                apt-get update
+                apt-get install -y libbsd-dev
+    steps:
+        - script:
+            name: Build & Test
+            code: |
+              make testbuild
+              make
