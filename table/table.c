@@ -2,7 +2,13 @@
 #include "common.h"
 #include "alloc.h"
 #include "type.h"
+#include "xerror.h"
+#include <bsd/string.h>
 #include <strings.h>
+
+static int _table_ncols(table_t * t);
+static int _table_cols_unmarshal(ALLOC * a, table_t * t);
+static int _table_cols_marshal(ALLOC * a, table_t * t);
 
 void *table2b(void *buf, table_t * t)
 {
@@ -39,28 +45,150 @@ size_t tblsizeof(table_t * t)
 	    vstrsizeof(t->indices) + vstrsizeof((char *)t->sizes);
 }
 
+table_t *_alloc_table(const char *name, int ncols)
+{
+	table_t *t;
+
+	if ((t = calloc(1, sizeof(table_t))) == NULL)
+		return NULL;
+	if ((t->name = calloc(1, strlen(name) + 1)) == NULL)
+		goto Error;
+	strcpy(t->name, name);
+
+	if ((t->scols = calloc(1, (NAMELEN + 3) * ncols)) == NULL)
+		goto Error;
+	if ((t->indices = calloc(1, (NAMELEN + 1) * ncols)) == NULL)
+		goto Error;
+	if ((t->sizes = calloc(1, ncols + 1)) == NULL)
+		goto Error;
+
+	t->ncols = ncols;
+	if ((t->cols = calloc(ncols, sizeof(col_t))) == NULL)
+		goto Error;
+	return t;
+ Error:
+	_free_table(t);
+	return NULL;
+}
+
+void _free_table(table_t * t)
+{
+	if (t->name != NULL)
+		free(t->name);
+	if (t->scols != NULL)
+		free(t->scols);
+	if (t->indices != NULL)
+		free(t->indices);
+	if (t->sizes != NULL)
+		free(t->sizes);
+	if (t->cols != NULL)
+		free(t->cols);
+}
+
+table_t *read_table(ALLOC * a, handle_t h)
+{
+	INIT_TABLE(tmp);
+	table_t *t;
+	unsigned char buf[TABLE_MAXLEN];
+	size_t len = TABLE_MAXLEN;
+	void *p;
+
+	if ((p = read_blk(a, h, buf, &len)) == NULL)
+		return NULL;
+	b2table(p, &tmp);
+	tmp.ncols = _table_ncols(&tmp);
+	if ((t = _alloc_table(tmp.name, tmp.ncols)) == NULL)
+		return NULL;
+	b2table(p, t);
+	if (p != buf)
+		buf_put(a, p);
+
+	if (_table_cols_unmarshal(a, t) < 0) {
+		_free_table(t);
+		return NULL;
+	}
+	return t;
+}
+
+int _table_ncols(table_t * t)
+{
+	char scols[SCOLS_MAXLEN];
+	char *p = scols;
+	int i = 0;
+
+	strlcpy(scols, t->scols, sizeof(scols));
+	do {
+		strsep(&p, ":");
+		i++;
+	} while (p != NULL);
+
+	return i;
+}
+
+// take a just-decoded table t, fill its 'ncols' and 'cols' field.
+int _table_cols_unmarshal(ALLOC * a, table_t * t)
+{
+	char scols[SCOLS_MAXLEN];
+	char indices[INDICES_MAXLEN];
+	char *p, *token;
+	int i;
+
+	strlcpy(scols, t->scols, sizeof(scols));
+	p = scols;
+	i = 0;
+	do {
+		token = strsep(&p, ":");
+		t->cols[i].type = *token++;
+		t->cols[i].unique = *token++;
+		strlcpy(t->cols[i++].name, token, NAMELEN + 1);
+	} while (p != NULL);
+	t->ncols = i;
+
+	strlcpy(indices, t->indices, sizeof(indices));
+	p = indices;
+	i = 0;
+	do {
+		token = strsep(&p, ":");
+		strlcpy(t->cols[i++].iname, token, NAMELEN + 1);
+	} while (p != NULL);
+
+	for (i = 0; i < t->ncols; i++)
+		t->cols[i].size = t->sizes[i];
+
+	void *buf;
+	size_t len;
+
+	if ((buf = read_blk(a, t->hxroots, NULL, &len)) == NULL)
+		return -1;
+	if (len != 7 * t->ncols) {
+		buf_put(a, buf);
+		return -1;
+	}
+	p = buf;
+	for (i = 0; i < t->ncols; i++) {
+		t->cols[i].index = b2hdl(p);
+		p += 7;
+	}
+	buf_put(a, buf);
+
+	return 0;
+}
+
 handle_t alloc_table(ALLOC * a, table_t * t)
 {
 	unsigned char buf[TABLE_MAXLEN];
 	size_t len;
 
+	len = 7 * t->ncols;
 	bzero(buf, sizeof(buf));
+	if ((t->hxroots = alloc_blk(a, buf, len)) == 0)
+		return 0;
+
+	if (_table_cols_marshal(a, t) < 0)
+		return 0;
+
 	len = (unsigned char *)table2b(buf, t) - buf;
 	return alloc_blk(a, buf, len);
-}
-
-int read_table(ALLOC * a, handle_t h, table_t * t)
-{
-	unsigned char b[TABLE_MAXLEN];
-	size_t len = TABLE_MAXLEN;
-	unsigned char *buf;
-
-	if ((buf = read_blk(a, h, b, &len)) == NULL)
-		return -1;
-	b2table(buf, t);
-	if (buf != b)
-		buf_put(a, buf);
-	return 0;
 }
 
 int write_table(ALLOC * a, handle_t h, table_t * t)
@@ -68,7 +196,50 @@ int write_table(ALLOC * a, handle_t h, table_t * t)
 	unsigned char buf[TABLE_MAXLEN];
 	size_t len;
 
+	if (_table_cols_marshal(a, t) < 0)
+		return -1;
 	bzero(buf, sizeof(buf));
 	len = (unsigned char *)table2b(buf, t) - buf;
 	return realloc_blk(a, h, buf, len);
+}
+
+int _table_cols_marshal(ALLOC * a, table_t * t)
+{
+	size_t len = (NAMELEN + 3) * t->ncols;
+	char *p = t->scols, *end = t->scols + len;
+
+	for (int i = 0; i < t->ncols; i++) {
+		*p++ = t->cols[i].type;
+		*p++ = t->cols[i].unique;
+		p = p + strlcpy(p, t->cols[i].name, end - p);
+		*p++ = ':';
+	}
+	*--p = 0;
+
+	len = (NAMELEN + 1) * t->ncols;
+	p = t->indices, end = t->indices + len;
+
+	for (int i = 0; i < t->ncols; i++) {
+		p = p + strlcpy(p, t->cols[i].iname, end - p);
+		*p++ = ':';
+	}
+	*--p = 0;
+
+	for (int i = 0; i < t->ncols; i++)
+		t->sizes[i] = t->cols[i].size;
+
+	void *buf;
+	if ((buf = read_blk(a, t->hxroots, NULL, &len)) == NULL)
+		return -1;
+	if (len != 7 * t->ncols) {
+		buf_put(a, buf);
+		return -1;
+	}
+	p = buf;
+	for (int i = 0; i < t->ncols; i++)
+		p = hdl2b(p, t->cols[i].index);
+
+	int ret = realloc_blk(a, t->hxroots, buf, len);
+	preserve_errno(buf_put(a, buf));
+	return ret;
 }

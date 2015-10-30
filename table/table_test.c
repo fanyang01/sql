@@ -23,7 +23,7 @@ int main(void)
 	t1.next = 123;
 	t1.head = 456;
 	t1.hxroots = 789;
-	strncpy(t1.name, "table_name", TABLENAME_MAXLEN);
+	strncpy(t1.name, "table_name", NAMELEN);
 	strncpy(t1.scols, "icol1:fcol2:scol3:icol4", SCOLS_MAXLEN);
 	strncpy(t1.indices, "index1::index3:", INDICES_MAXLEN);
 	strncpy((char *)t1.sizes, "\x04\x04\xFF\x04", MAXCOLS);

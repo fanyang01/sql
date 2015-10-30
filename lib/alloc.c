@@ -16,42 +16,25 @@ static size_t len_need(size_t len);
 static handle_t len2atom(size_t len);
 static int flt_idx(handle_t size);
 
-ALLOC *new_allocator(int fd, int mode)
+int init_allocator(ALLOC * a, int fd, int oflag)
 {
-	ALLOC *allocator;
-
-	switch (mode) {
-	case ALLOC_M_OPEN:
-		if (fsize(fd) <= 0)
-			return NULL;
-		if ((allocator = calloc(sizeof(ALLOC), 1)) == NULL)
-			return NULL;
-
-		allocator->fd = fd;
-		if (readat(fd, &allocator->flt,
-			   ALLOC_FLT_LEN, 0) != ALLOC_FLT_LEN) {
-			preserve_errno(free(allocator));
-			return NULL;
-		}
-		return allocator;
-	case ALLOC_M_NEW:
+	a->fd = fd;
+	bzero(a->flt, FLT_LEN);
+	if (oflag & O_CREAT) {
 		if (ftruncate(fd, 0) == -1)
-			return NULL;
-		if (alloc(fd, 0, ALLOC_FLT_LEN) == -1)
-			return NULL;
-		if ((allocator = calloc(sizeof(ALLOC), 1)) == NULL)
-			return NULL;
-		allocator->fd = fd;
-		if (writeat(fd, &allocator->flt,
-			    ALLOC_FLT_LEN, 0) != ALLOC_FLT_LEN) {
-			preserve_errno(free(allocator));
-			return NULL;
-		}
-		return allocator;
-	default:
-		errno = EINVAL;
-		return NULL;
+			return -1;
+		if (alloc(fd, 0, FLT_LEN) == -1)
+			return -1;
+		if (writeat(fd, a->flt, FLT_LEN, 0) != FLT_LEN)
+			return -1;
+		return 0;
 	}
+	/* open an existing allocator */
+	if (fsize(fd) <= 0)
+		return -1;
+	if (readat(fd, a->flt, FLT_LEN, 0) != FLT_LEN)
+		return -1;
+	return 0;
 }
 
 handle_t alloc_blk(ALLOC * a, void *buf, size_t len)
@@ -64,10 +47,10 @@ handle_t alloc_blk(ALLOC * a, void *buf, size_t len)
 	if ((h = flt_find(a, req, &idx)) == 0) {	// no free blocks
 		off_t tail = fsize(a->fd);
 
-		if (tail <= 0 || tail % ALLOC_ATOM_LEN != 0)
+		if (tail <= 0 || tail % ATOM_LEN != 0)
 			return 0;
 		h = off2hdl(tail);
-		if (alloc(a->fd, tail, req * ALLOC_ATOM_LEN) == -1)
+		if (alloc(a->fd, tail, req * ATOM_LEN) == -1)
 			return 0;
 		if (use_blk(a, h, buf, len) != 0)
 			return 0;
@@ -82,13 +65,13 @@ handle_t alloc_blk(ALLOC * a, void *buf, size_t len)
 		return 0;
 	tag = atom[0];
 	switch (tag) {
-	case FRBLK_FLAG_SINGLE:
+	case FRBLK_SINGLE:
 		atoms = 1;
 		prev = b2hdl(&atom[1]);
 		next = b2hdl(&atom[8]);
 		// TODO: verify last byte
 		break;
-	case FRBLK_FLAG_LONG:
+	case FRBLK_LONG:
 		if ((atoms = read_handle(a->fd, hdl2off(h) + 16)) == 0)
 			return 0;
 		prev = b2hdl(&atom[1]);
@@ -106,7 +89,7 @@ handle_t alloc_blk(ALLOC * a, void *buf, size_t len)
 		if (free_blk(a, h_free, atoms_free) != 0)
 			return 0;
 	}
-	if (alloc(a->fd, hdl2off(h), req * ALLOC_ATOM_LEN) == -1)
+	if (alloc(a->fd, hdl2off(h), req * ATOM_LEN) == -1)
 		return 0;
 	if (use_blk(a, h, buf, len) != 0)
 		return 0;
@@ -119,7 +102,7 @@ void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len)
 		return NULL;
 	off_t offset;
 	size_t need;
-	unsigned char bytes[ALLOC_ATOM_LEN];
+	unsigned char bytes[ATOM_LEN];
 	int newbuf = 0, redirect = 0;
 
  Retry:
@@ -127,15 +110,15 @@ void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len)
 	if (readat(a->fd, bytes, 8, offset) != 8)
 		return NULL;
 	switch (bytes[0]) {
-	case CTBLK_FLAG_SHORT:
+	case CTBLK_SHORT:
 		need = (size_t) bytes[1];
 		offset += 2;
 		break;
-	case CTBLK_FLAG_LONG:
+	case CTBLK_LONG:
 		need = (size_t) b2uint16(&bytes[1]);
 		offset += 3;
 		break;
-	case REBLK_FLAG:
+	case REBLK:
 		if (redirect)	// allow redirect only once
 			return NULL;
 		handle = b2hdl(&bytes[1]);
@@ -173,13 +156,13 @@ int dealloc_blk(ALLOC * a, handle_t handle)
 	if (readat(a->fd, bytes, 8, offset) != 8)
 		return -1;
 	switch (bytes[0]) {
-	case CTBLK_FLAG_SHORT:
+	case CTBLK_SHORT:
 		len = (size_t) bytes[1];
 		break;
-	case CTBLK_FLAG_LONG:
+	case CTBLK_LONG:
 		len = (size_t) b2uint16(&bytes[1]);
 		break;
-	case REBLK_FLAG:
+	case REBLK:
 		if (redirected)	// allow only once redirect
 			return -1;
 		redirect = b2hdl(&bytes[1]);
@@ -213,13 +196,13 @@ int realloc_blk(ALLOC * a, handle_t handle, void *buf, size_t len)
 	if (readat(a->fd, bytes, 8, offset) != 8)
 		return -1;
 	switch (bytes[0]) {
-	case CTBLK_FLAG_SHORT:
+	case CTBLK_SHORT:
 		olen = (size_t) bytes[1];
 		break;
-	case CTBLK_FLAG_LONG:
+	case CTBLK_LONG:
 		olen = (size_t) b2uint16(&bytes[1]);
 		break;
-	case REBLK_FLAG:
+	case REBLK:
 		if (redirected)	// allow only once redirect
 			return -1;
 		prev_handle = handle;
@@ -251,7 +234,7 @@ int realloc_blk(ALLOC * a, handle_t handle, void *buf, size_t len)
 	}
 	if ((new_handle = alloc_blk(a, buf, len)) == 0)
 		return -1;
-	bytes[0] = REBLK_FLAG;
+	bytes[0] = REBLK;
 	hdl2b(&bytes[1], new_handle);
 	bzero(&bytes[8], 8);
 	if (writeat(a->fd, bytes, 16, hdl2off(prev_handle)) != 16)
@@ -272,10 +255,10 @@ int free_blk(ALLOC * a, handle_t h, handle_t atoms)
 	case 0:
 		return -1;
 	case 1:
-		buf[0] = buf[15] = FRBLK_FLAG_SINGLE;
+		buf[0] = buf[15] = FRBLK_SINGLE;
 		break;
 	default:
-		buf[0] = buf[15] = FRBLK_FLAG_LONG;
+		buf[0] = buf[15] = FRBLK_LONG;
 		if (write_handle(a->fd, atoms, hdl2off(h) + 16) != 0)
 			return -1;
 	}
@@ -292,19 +275,19 @@ int free_blk(ALLOC * a, handle_t h, handle_t atoms)
 int use_blk(ALLOC * a, handle_t h, void *buf, size_t len)
 {
 	size_t need = len_need(len);
-	size_t padding = len2atom(len) * ALLOC_ATOM_LEN - need;
+	size_t padding = len2atom(len) * ATOM_LEN - need;
 	unsigned char *b;
 
 	if ((b = buf_get(a, need + padding)) == NULL)
 		return -1;
 
 	if (len <= CTBLK_MAXSHORT) {
-		b[0] = CTBLK_FLAG_SHORT;
+		b[0] = CTBLK_SHORT;
 		b[1] = (unsigned char)len;
 		memcpy(&b[2], buf, len);
 		bzero(&b[2 + len], padding);
 	} else {
-		b[0] = CTBLK_FLAG_LONG;
+		b[0] = CTBLK_LONG;
 		uint16tob(&b[1], len);
 		memcpy(&b[3], buf, len);
 		bzero(&b[3 + len], padding);
@@ -321,7 +304,7 @@ int flt_remove(ALLOC * a, int idx, handle_t prev, handle_t next)
 {
 	if (prev == 0) {	// head
 		a->flt[idx] = next;
-		if (writeat(a->fd, a->flt, ALLOC_FLT_LEN, 0) != ALLOC_FLT_SIZE)
+		if (writeat(a->fd, a->flt, FLT_LEN, 0) != FLT_LEN)
 			return -1;
 		return list_setprev(a, next, 0);
 	}
@@ -347,7 +330,7 @@ int list_setnext(ALLOC * a, handle_t x, handle_t next)
 handle_t flt_find(ALLOC * a, handle_t req, int *idx)
 {
 	handle_t h = 0;
-	for (int i = flt_idx(req); i < ALLOC_FLT_SIZE; i++)
+	for (int i = flt_idx(req); i < FLT_SIZE; i++)
 		if (a->flt[i] != 0) {
 			h = a->flt[i];
 			*idx = i;
@@ -362,7 +345,7 @@ size_t len_need(size_t len)
 
 handle_t len2atom(size_t len)
 {
-	return (len_need(len) - 1) / ALLOC_ATOM_LEN + 1;
+	return (len_need(len) - 1) / ATOM_LEN + 1;
 }
 
 int flt_idx(handle_t atoms)

@@ -60,33 +60,34 @@
  */
 #include <stdlib.h>
 #include <stdint.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
-#define ALLOC_M_OPEN 0
-#define ALLOC_M_NEW 1
-#define ALLOC_FLT_SIZE 14	/* 2 ^ 14 = 64K / 16  */
-#define ALLOC_ATOM_LEN 16
-#define ALLOC_FLT_LEN (ALLOC_FLT_SIZE * sizeof(handle_t))
+#define FLT_SIZE 14		/* 2 ^ 14 = 64K / 16  */
+#define ATOM_LEN 16
+#define FLT_LEN (FLT_SIZE * sizeof(handle_t))
 
 #define CTBLK_MAXSHORT 254
 #define CTBLK_MAXLONG 65533
-#define CTBLK_FLAG_SHORT 0x1
-#define CTBLK_FLAG_LONG 0x2
-#define REBLK_FLAG 0x4
-#define FRBLK_FLAG_SINGLE 0x8
-#define FRBLK_FLAG_LONG 0x10
+#define CTBLK_SHORT 0x1
+#define CTBLK_LONG 0x2
+#define REBLK 0x4
+#define FRBLK_SINGLE 0x8
+#define FRBLK_LONG 0x10
 
 typedef uint64_t handle_t;
 typedef struct {
 	int fd;
-	handle_t flt[ALLOC_FLT_SIZE];
+	handle_t flt[FLT_SIZE];
 } ALLOC;
 
 /*
  * Returns an allocator on file fd according to mode:
- * if mode == ALLOC_M_OPEN, open an exist allocator;
- * if mode == ALLOC_M_NEW, create a new allocator.
+ * - if oflag ORed with O_CREAT, create a new allocator;
+ * - else, open an existing allocator.
  */
-extern ALLOC *new_allocator(int fd, int mode);
+extern int init_allocator(ALLOC * a, int fd, int oflag);
 /*
  * Allocate a block large enough and copy len bytes into it.
  *

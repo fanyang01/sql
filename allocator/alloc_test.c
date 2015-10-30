@@ -10,12 +10,13 @@ int main(void)
 	FILE *f = tmpfile();
 	assert(f != NULL);
 	int fd = fileno(f);
+	ALLOC allocator;
+	ALLOC *a = &allocator;
 
-	ALLOC *a;
-	assert((a = new_allocator(fd, ALLOC_M_OPEN)) == NULL);
+	assert(init_allocator(a, fd, 0) != 0);
 
-	assert((a = new_allocator(fd, ALLOC_M_NEW)) != NULL);
-	assert(fsize(fd) == ALLOC_FLT_LEN);
+	assert(init_allocator(a, fd, O_CREAT) == 0);
+	assert(fsize(fd) == FLT_LEN);
 
 	char buf[] = "hello, world";
 	handle_t h, h1;

@@ -43,14 +43,14 @@ void *hdl2b(void *buf, handle_t h)
 
 off_t hdl2off(handle_t handle)
 {
-	return ALLOC_FLT_LEN + (handle - 1) * ALLOC_ATOM_LEN;
+	return FLT_LEN + (handle - 1) * ATOM_LEN;
 }
 
 handle_t off2hdl(off_t offset)
 {
-	if (offset < ALLOC_FLT_LEN)
+	if (offset < FLT_LEN)
 		return 0;
-	return (offset - ALLOC_FLT_LEN) / ALLOC_ATOM_LEN + 1;
+	return (offset - FLT_LEN) / ATOM_LEN + 1;
 }
 
 handle_t read_handle(int fd, off_t offset)
