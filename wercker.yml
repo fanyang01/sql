@@ -7,7 +7,6 @@ build:
             code: |
                 apt-get update
                 apt-get install -y libbsd-dev
-    steps:
         - script:
             name: Build & Test
             code: |
