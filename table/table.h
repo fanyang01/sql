@@ -22,12 +22,6 @@ typedef struct {
 	handle_t index;
 } col_t;
 
-typedef union {
-	int i;
-	float f;
-	char *s;
-} colv_t;
-
 typedef struct table {
 	handle_t next;		// next table metadata
 	handle_t head;		// -> first record
@@ -39,6 +33,7 @@ typedef struct table {
 	/* not encoded */
 	int ncols;
 	col_t *cols;
+	handle_t self;
 	struct table *next_table;
 	struct table *prev_table;
 } table_t;
@@ -58,6 +53,7 @@ typedef struct table {
 		.sizes = NAME##_sizes, \
 		.ncols = 0, \
 		.cols = NULL, \
+		.self = 0, \
 		.next_table = NULL, \
 		.prev_table = NULL, \
 	}

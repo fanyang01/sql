@@ -1,13 +1,26 @@
 #ifndef _RECORD_H
 #define _RECORD_H
 
+#include "alloc.h"
+#include "table.h"
+
 typedef struct {
-	colv_t *cols;
-	int ncols;
+	char type;
+	union {
+		int i;
+		float f;
+		char *s;
+	} value;
+} colv_t;
+
+typedef struct {
+	int len;
+	colv_t vals[];
 } record_t;
 
-record_t *read_row(DB * db, handle_t h, col_t * cols, int ncols);
-int update_row(DB * db, handle_t h, col_t * cols, record_t * r);
-void free_record(col_t * cols, record_t * r);
+extern handle_t alloc_record(ALLOC * a, table_t * t, record_t * r);
+extern record_t *read_record(ALLOC * a, table_t * t, handle_t h);
+extern int update_record(ALLOC * a, table_t * t, handle_t h, record_t * r);
+extern void free_record(record_t * r);
 
 #endif

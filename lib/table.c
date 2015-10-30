@@ -103,6 +103,7 @@ table_t *read_table(ALLOC * a, handle_t h)
 	if (p != buf)
 		buf_put(a, p);
 
+	t->self = h;
 	if (_table_cols_unmarshal(a, t) < 0) {
 		_free_table(t);
 		return NULL;
@@ -156,7 +157,7 @@ int _table_cols_unmarshal(ALLOC * a, table_t * t)
 		t->cols[i].size = t->sizes[i];
 
 	void *buf;
-	size_t len;
+	size_t len = 0;
 
 	if ((buf = read_blk(a, t->hxroots, NULL, &len)) == NULL)
 		return -1;
@@ -188,7 +189,8 @@ handle_t alloc_table(ALLOC * a, table_t * t)
 		return 0;
 
 	len = (unsigned char *)table2b(buf, t) - buf;
-	return alloc_blk(a, buf, len);
+	t->self = alloc_blk(a, buf, len);
+	return t->self;
 }
 
 int write_table(ALLOC * a, handle_t h, table_t * t)
@@ -225,10 +227,16 @@ int _table_cols_marshal(ALLOC * a, table_t * t)
 	}
 	*--p = 0;
 
-	for (int i = 0; i < t->ncols; i++)
-		t->sizes[i] = t->cols[i].size;
+	for (int i = 0; i < t->ncols; i++) {
+		if (t->cols[i].type == TYPE_STRING)
+			t->sizes[i] = t->cols[i].size;
+		else		// int and float
+			t->sizes[i] = 4;
+	}
 
 	void *buf;
+
+	len = 0;
 	if ((buf = read_blk(a, t->hxroots, NULL, &len)) == NULL)
 		return -1;
 	if (len != 7 * t->ncols) {

@@ -127,10 +127,10 @@ void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len)
 	default:
 		return NULL;
 	}
-	*len = need;
-	if (need > *len) {
+	if (buf == NULL || need > *len) {
 		if ((buf = buf_get(a, need)) == NULL)
 			return NULL;
+		*len = need;
 		newbuf = 1;
 	}
 	if (readat(a->fd, buf, need, offset) != need) {

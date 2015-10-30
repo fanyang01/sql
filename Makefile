@@ -3,7 +3,7 @@ INCLUDE_DIR=./include
 LIB_DIR=./lib
 BUILD_DIR=./build
 
-CC=gcc -Wall -I $(INCLUDE_DIR) -lpthread -lbsd
+CC=gcc -Wall -I $(INCLUDE_DIR) -lpthread -lbsd -g
 
 SUBDIRS := $(filter-out lib/, \
 	$(dir \

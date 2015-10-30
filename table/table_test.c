@@ -1,3 +1,4 @@
+#include "alloc.h"
 #include "table.h"
 #include <stdio.h>
 #include <assert.h>
@@ -31,5 +32,38 @@ int main(void)
 	assert((unsigned char *)table2b(buf, &t1) - buf == tblsizeof(&t1));
 	assert((unsigned char *)b2table(buf, &t2) - buf == tblsizeof(&t1));
 	assert(equal(&t1, &t2));
+
+	table_t *t = _alloc_table("test_table", 3);
+	assert(t != NULL);
+	strcpy(t->cols[0].name, "column1");
+	t->cols[0].type = 'i';
+	t->cols[0].unique = 'p';
+	t->cols[0].size = 4;
+	strcpy(t->cols[1].name, "column2");
+	t->cols[1].type = 'i';
+	t->cols[1].unique = 'n';
+	t->cols[1].size = 4;
+	strcpy(t->cols[2].name, "column3");
+	t->cols[2].type = 's';
+	t->cols[2].unique = 'u';
+	t->cols[2].size = 12;
+
+	FILE *f = tmpfile();
+	int fd = fileno(f);
+	ALLOC allocator, *a = &allocator;
+	handle_t h;
+	table_t *t3;
+
+	assert(init_allocator(a, fd, O_CREAT) == 0);
+	assert((h = alloc_table(a, t)) != 0);
+	assert((t3 = read_table(a, h)) != NULL);
+	assert(equal(t, t3));
+	_free_table(t3);
+
+	strcpy(t->name, "table");
+	assert((write_table(a, h, t)) == 0);
+	assert((t3 = read_table(a, h)) != NULL);
+	assert(equal(t, t3));
+
 	return 0;
 }
