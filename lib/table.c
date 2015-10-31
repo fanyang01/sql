@@ -1,4 +1,5 @@
 #include "table.h"
+#include "record.h"
 #include "common.h"
 #include "alloc.h"
 #include "type.h"

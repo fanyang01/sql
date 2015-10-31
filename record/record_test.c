@@ -88,6 +88,9 @@ int main(void)
 	assert(r != NULL);
 	assert(r->vals[0].value.i == 125);
 
+	assert(clear_table(a, t) == 0);
+	assert(t->head == 0 && t->tail == 0);
+
 	_free_table(t);
 	_free_record(r);
 	_free_record(r1);

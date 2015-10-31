@@ -82,3 +82,17 @@ void _free_db(DB * db)
 	free(db->name);
 	free(db);
 }
+
+int delete_table(ALLOC * a, table_t * t)
+{
+	if (clear_table(a, t) < 0)
+		return -1;
+	if (t->prev_table != NULL)
+		t->prev_table->next_table = t->next_table;
+	if (t->next_table != NULL)
+		t->next_table->prev_table = t->prev_table;
+	if (dealloc_blk(a, t->self) < 0)
+		return -1;
+	_free_table(t);
+	return 0;
+}

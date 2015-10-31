@@ -32,5 +32,6 @@ extern handle_t alloc_record(ALLOC * a, table_t * t, record_t * r);
 extern record_t *read_record(ALLOC * a, table_t * t, handle_t h);
 extern int update_record(ALLOC * a, table_t * t, handle_t h, record_t * r);
 extern int delete_record(ALLOC * a, table_t * t, handle_t h);
+extern int clear_table(ALLOC * a, table_t * t);
 
 #endif

@@ -3,6 +3,7 @@
 
 #include "alloc.h"
 #include "table.h"
+#include "record.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -16,5 +17,6 @@ typedef struct {
 
 extern DB *opendb(const char *path, int oflag, ...);
 extern void closedb(DB * db);
+extern int delete_table(ALLOC * a, table_t * t);
 
 #endif

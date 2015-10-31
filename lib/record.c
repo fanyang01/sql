@@ -276,6 +276,24 @@ int delete_record(ALLOC * a, table_t * t, handle_t h)
 
 }
 
+int clear_table(ALLOC * a, table_t * t)
+{
+	handle_t h;
+	record_t *r;
+	int ret;
+
+	for (h = t->head; h != 0;) {
+		if ((r = read_record(a, t, h)) == NULL)
+			return -1;
+		h = r->next;
+		ret = delete_record(a, t, r->self);
+		_free_record(r);
+		if (ret < 0)
+			return -1;
+	}
+	return 0;
+}
+
 void _free_record(record_t * r)
 {
 	for (int i = 0; i < r->len; i++)
