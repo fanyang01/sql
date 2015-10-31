@@ -39,8 +39,30 @@ void *record2b(void *buf, table_t * t, record_t * r)
 {
 	void *p = buf;
 
-	p = hdl2b(buf, r->prev);
-	p = hdl2b(buf, r->next);
+	p = hdl2b(p, r->prev);
+	p = hdl2b(p, r->next);
+	for (int i = 0; i < r->len; i++) {
+		switch (r->vals[i].type) {
+		case TYPE_INT:
+			p = int32tob(p, r->vals[i].value.i);
+			break;
+		case TYPE_FLOAT:
+			p = float2b(p, r->vals[i].value.f);
+			break;
+		case TYPE_STRING:
+			p = str2b(p, t->sizes[i], r->vals[i].value.s);
+			break;
+		}
+	}
+	return p;
+}
+
+// skip leading prev and next handle
+void *record2b_skip(void *buf, table_t * t, record_t * r)
+{
+	void *p = buf;
+
+	p += 2 * 7;
 	for (int i = 0; i < r->len; i++) {
 		switch (r->vals[i].type) {
 		case TYPE_INT:
@@ -152,14 +174,36 @@ handle_t alloc_record(ALLOC * a, table_t * t, record_t * r)
 	return h;
 }
 
+record_t *_alloc_record(table_t * t)
+{
+	record_t *r;
+	char *p;
+
+	if ((r = malloc(sizeof(record_t) + t->ncols * sizeof(colv_t))) == NULL)
+		return NULL;
+
+	for (int i = 0; i < t->ncols; i++) {
+		r->vals[i].type = t->cols[i].type;
+		switch (t->cols[i].type) {
+		case TYPE_STRING:
+			if ((p = calloc(1, t->sizes[i])) == NULL) {
+				preserve_errno(_free_record(r));
+				return NULL;
+			}
+			r->vals[i].value.s = p;
+		}
+	}
+	r->len = t->ncols;
+	return r;
+}
+
 record_t *read_record(ALLOC * a, table_t * t, handle_t h)
 {
 	record_t *r;
 	void *buf, *p;
-	char *dst;
 	size_t len = 0;
 
-	if ((r = malloc(sizeof(record_t) + t->ncols * sizeof(colv_t))) == NULL)
+	if ((r = _alloc_record(t)) == NULL)
 		return NULL;
 	if ((buf = read_blk(a, h, NULL, &len)) == NULL)
 		goto Error;
@@ -170,7 +214,6 @@ record_t *read_record(ALLOC * a, table_t * t, handle_t h)
 	r->next = b2hdl(p);
 	p += 7;
 	for (int i = 0; i < t->ncols; i++) {
-		r->vals[i].type = t->cols[i].type;
 		switch (t->cols[i].type) {
 		case TYPE_INT:
 			r->vals[i].value.i = b2int32(p);
@@ -181,11 +224,7 @@ record_t *read_record(ALLOC * a, table_t * t, handle_t h)
 			p += 4;
 			break;
 		case TYPE_STRING:
-			dst = malloc(t->sizes[i]);
-			if (dst == NULL)
-				goto Error;
-			strlcpy(dst, p, t->sizes[i]);
-			r->vals[i].value.s = dst;
+			strlcpy(r->vals[i].value.s, p, t->sizes[i]);
 			break;
 		default:
 			goto Error;
@@ -198,21 +237,22 @@ record_t *read_record(ALLOC * a, table_t * t, handle_t h)
  Error:
 	if (buf != NULL)
 		preserve_errno(buf_put(a, buf));
-	preserve_errno(free(r));
+	preserve_errno(_free_record(r));
 	return NULL;
 }
 
 int update_record(ALLOC * a, table_t * t, handle_t h, record_t * r)
 {
 	unsigned char *buf, *p;
+	size_t len = 0;
 	int ret;
 
 	if (!validate_record(a, t, r))
-		return 0;
-	if ((buf = buf_get(a, _sizeof_record(t, r))) == NULL)
-		return 0;
+		return -1;
+	if ((buf = read_blk(a, h, NULL, &len)) == NULL)
+		return -1;
 
-	p = record2b(buf, t, r);
+	p = record2b_skip(buf, t, r);
 	ret = realloc_blk(a, h, buf, p - buf);
 	buf_put(a, buf);
 	return ret;
@@ -231,15 +271,16 @@ int delete_record(ALLOC * a, table_t * t, handle_t h)
 		goto Error;
 	ret = 0;
  Error:
-	free_record(r);
+	_free_record(r);
 	return ret;
 
 }
 
-void free_record(record_t * r)
+void _free_record(record_t * r)
 {
 	for (int i = 0; i < r->len; i++)
 		if (r->vals[i].type == TYPE_STRING)
-			free(r->vals[i].value.s);
+			if (r->vals[i].value.s != NULL)
+				free(r->vals[i].value.s);
 	free(r);
 }

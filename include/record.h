@@ -26,10 +26,11 @@ typedef struct {
 	colv_t vals[];
 } record_t;
 
+extern record_t *_alloc_record(table_t * t);
+extern void _free_record(record_t * r);
 extern handle_t alloc_record(ALLOC * a, table_t * t, record_t * r);
 extern record_t *read_record(ALLOC * a, table_t * t, handle_t h);
 extern int update_record(ALLOC * a, table_t * t, handle_t h, record_t * r);
 extern int delete_record(ALLOC * a, table_t * t, handle_t h);
-extern void free_record(record_t * r);
 
 #endif

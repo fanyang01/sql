@@ -1,4 +1,5 @@
 #include "alloc.h"
+#include "type.h"
 #include "table.h"
 #include <stdio.h>
 #include <assert.h>
@@ -8,6 +9,7 @@ static int equal(table_t * t1, table_t * t2)
 {
 	return t1->next == t2->next &&
 	    t1->head == t2->head &&
+	    t1->tail == t2->tail &&
 	    t1->hxroots == t2->hxroots &&
 	    strcmp(t1->name, t2->name) == 0 &&
 	    strcmp(t1->scols, t2->scols) == 0 &&
@@ -36,16 +38,14 @@ int main(void)
 	table_t *t = _alloc_table("test_table", 3);
 	assert(t != NULL);
 	strcpy(t->cols[0].name, "column1");
-	t->cols[0].type = 'i';
-	t->cols[0].unique = 'p';
-	t->cols[0].size = 4;
+	t->cols[0].type = TYPE_INT;
+	t->cols[0].unique = COL_PRIMARY;
 	strcpy(t->cols[1].name, "column2");
-	t->cols[1].type = 'i';
-	t->cols[1].unique = 'n';
-	t->cols[1].size = 4;
+	t->cols[1].type = TYPE_INT;
+	t->cols[1].unique = COL_NORMAL;
 	strcpy(t->cols[2].name, "column3");
-	t->cols[2].type = 's';
-	t->cols[2].unique = 'u';
+	t->cols[2].type = TYPE_STRING;
+	t->cols[2].unique = COL_UNIQUE;
 	t->cols[2].size = 12;
 
 	FILE *f = tmpfile();
