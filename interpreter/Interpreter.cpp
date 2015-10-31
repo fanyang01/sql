@@ -10,6 +10,7 @@
 #include"Interpreter.h"
 #include <cctype>
 #include<cstdlib>
+#include <cstring>
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Read the user's input
 string read_input()
