@@ -59,6 +59,5 @@ int main(void)
 	assert(size == sizeof(buf));
 	assert(strncmp(buf, "hello, world", sizeof(buf)) == 0);
 
-	printf("PASS\n");
 	return 0;
 }

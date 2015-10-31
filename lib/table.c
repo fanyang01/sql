@@ -6,6 +6,7 @@
 #include <bsd/string.h>
 #include <strings.h>
 
+// use t->scols
 static int _table_ncols(table_t * t);
 static int _table_cols_unmarshal(ALLOC * a, table_t * t);
 static int _table_cols_marshal(ALLOC * a, table_t * t);
@@ -13,36 +14,47 @@ static int _table_cols_marshal(ALLOC * a, table_t * t);
 void *table2b(void *buf, table_t * t)
 {
 	unsigned char *p = buf;
+	int ncols = _table_ncols(t);
+
 	p = hdl2b(p, t->next);
 	p = hdl2b(p, t->head);
+	p = hdl2b(p, t->tail);
 	p = hdl2b(p, t->hxroots);
 	p = vstr2b(p, t->name);
 	p = vstr2b(p, t->scols);
 	p = vstr2b(p, t->indices);
-	p = vstr2b(p, (char *)t->sizes);
+	bcopy(t->sizes, p, ncols);
+	p += ncols;
 	return p;
 }
 
 void *b2table(void *buf, table_t * t)
 {
 	unsigned char *p = buf;
+	int ncols;
+
 	t->next = b2hdl(p);
 	p += 7;
 	t->head = b2hdl(p);
+	p += 7;
+	t->tail = b2hdl(p);
 	p += 7;
 	t->hxroots = b2hdl(p);
 	p += 7;
 	p = b2vstr(p, t->name);
 	p = b2vstr(p, t->scols);
 	p = b2vstr(p, t->indices);
-	p = b2vstr(p, (char *)t->sizes);
+
+	ncols = _table_ncols(t);
+	bcopy(p, t->sizes, ncols);
+	p += ncols;
 	return p;
 }
 
 size_t tblsizeof(table_t * t)
 {
-	return 7 + 7 + 7 + vstrsizeof(t->name) + vstrsizeof(t->scols) +
-	    vstrsizeof(t->indices) + vstrsizeof((char *)t->sizes);
+	return 7 + 7 + 7 + 7 + vstrsizeof(t->name) + vstrsizeof(t->scols) +
+	    vstrsizeof(t->indices) + _table_ncols(t);
 }
 
 table_t *_alloc_table(const char *name, int ncols)
@@ -59,7 +71,7 @@ table_t *_alloc_table(const char *name, int ncols)
 		goto Error;
 	if ((t->indices = calloc(1, (NAMELEN + 1) * ncols)) == NULL)
 		goto Error;
-	if ((t->sizes = calloc(1, ncols + 1)) == NULL)
+	if ((t->sizes = calloc(1, ncols)) == NULL)
 		goto Error;
 
 	t->ncols = ncols;

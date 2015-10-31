@@ -11,8 +11,12 @@
 #define INDICES_MAXLEN ((NAMELEN+1) * MAXCOLS)
 
 /* +2 means two bytes used to store the length of string */
-#define TABLE_MAXLEN (3*7 + NAMELEN+2 + \
+#define TABLE_MAXLEN (4*7 + NAMELEN+2 + \
 		SCOLS_MAXLEN+2 + INDICES_MAXLEN+2 + MAXCOLS)
+
+#define COL_PRIMARY 'p'
+#define COL_UNIQUE 'u'
+#define COL_NORMAL 'n'
 
 typedef struct {
 	char name[NAMELEN + 1];
@@ -25,6 +29,7 @@ typedef struct {
 typedef struct table {
 	handle_t next;		// next table metadata
 	handle_t head;		// -> first record
+	handle_t tail;		// -> last record
 	handle_t hxroots;	// -> [root1, 0, root3, 0]
 	char *name;		// name of table
 	char *scols;		// "ipcol1:fucol2:sncol3:incol4"
@@ -47,6 +52,7 @@ typedef struct table {
 		.next = 0, \
 		.name = NAME##_name, \
 		.head = 0, \
+		.tail = 0, \
 		.scols = NAME##_scols, \
 		.indices = NAME##_indices, \
 		.hxroots = 0, \
