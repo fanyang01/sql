@@ -274,6 +274,8 @@ int free_blk(ALLOC * a, handle_t h, handle_t atoms)
 		if (write_handle(a->fd, atoms, hdl2off(h) + 16) != 0)
 			return -1;
 	}
+	if (writeat(a->fd, buf, sizeof(buf), hdl2off(h)) != sizeof(buf))
+		return -1;
 	idx = flt_idx(atoms);
 	next = a->flt[idx];
 	a->flt[idx] = h;
