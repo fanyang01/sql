@@ -80,7 +80,7 @@ table_t *_alloc_table(const char *name, int ncols)
 		goto Error;
 	return t;
  Error:
-	_free_table(t);
+	preserve_errno(_free_table(t));
 	return NULL;
 }
 
@@ -118,7 +118,7 @@ table_t *read_table(ALLOC * a, handle_t h)
 
 	t->self = h;
 	if (_table_cols_unmarshal(a, t) < 0) {
-		_free_table(t);
+		preserve_errno(_free_table(t));
 		return NULL;
 	}
 	return t;
@@ -176,6 +176,7 @@ int _table_cols_unmarshal(ALLOC * a, table_t * t)
 		return -1;
 	if (len != 7 * t->ncols) {
 		buf_put(a, buf);
+		xerrno = FATAL_INVDB;
 		return -1;
 	}
 	p = buf;
@@ -254,6 +255,7 @@ int _table_cols_marshal(ALLOC * a, table_t * t)
 		return -1;
 	if (len != 7 * t->ncols) {
 		buf_put(a, buf);
+		xerrno = FATAL_INVDB;
 		return -1;
 	}
 	p = buf;
@@ -261,7 +263,7 @@ int _table_cols_marshal(ALLOC * a, table_t * t)
 		p = hdl2b(p, t->cols[i].index);
 
 	int ret = realloc_blk(a, t->hxroots, buf, len);
-	preserve_errno(buf_put(a, buf));
+	buf_put(a, buf);
 	return ret;
 }
 

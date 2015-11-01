@@ -30,8 +30,10 @@ int init_allocator(ALLOC * a, int fd, int oflag)
 		return 0;
 	}
 	/* open an existing allocator */
-	if (fsize(fd) <= 0)
+	if (fsize(fd) <= 0) {
+		xerrno = FATAL_INVDB;
 		return -1;
+	}
 	if (readat(fd, a->flt, FLT_LEN, 0) != FLT_LEN)
 		return -1;
 	return 0;
@@ -42,13 +44,17 @@ handle_t alloc_blk(ALLOC * a, void *buf, size_t len)
 	handle_t req = len2atom(len), h;
 	int idx;
 
-	if (len > CTBLK_MAXLONG)
+	if (len > CTBLK_MAXLONG) {
+		xerrno = FATAL_BLKSIZE;
 		return 0;
+	}
 	if ((h = flt_find(a, req, &idx)) == 0) {	// no free blocks
 		off_t tail = fsize(a->fd);
 
-		if (tail <= 0 || tail % ATOM_LEN != 0)
+		if (tail <= 0 || tail % ATOM_LEN != 0) {
+			xerrno = FATAL_INVDB;
 			return 0;
+		}
 		h = off2hdl(tail);
 		if (alloc(a->fd, tail, req * ATOM_LEN) == -1)
 			return 0;
@@ -72,13 +78,16 @@ handle_t alloc_blk(ALLOC * a, void *buf, size_t len)
 		// TODO: verify last byte
 		break;
 	case FRBLK_LONG:
-		if ((atoms = read_handle(a->fd, hdl2off(h) + 16)) == 0)
+		if ((atoms = read_handle(a->fd, hdl2off(h) + 16)) == 0) {
+			xerrno = FATAL_BLKSIZE;
 			return 0;
+		}
 		prev = b2hdl(&atom[1]);
 		next = b2hdl(&atom[8]);
 		// TODO: verify last byte
 		break;
 	default:
+		xerrno = FATAL_BLKTAG;
 		return 0;
 	}
 	if (flt_remove(a, idx, prev, next) != 0)
@@ -125,6 +134,7 @@ void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len)
 		redirect = 1;
 		goto Retry;
 	default:
+		xerrno = FATAL_BLKTAG;
 		return NULL;
 	}
 	if (buf == NULL || need > *len) {
@@ -135,7 +145,7 @@ void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len)
 	}
 	if (readat(a->fd, buf, need, offset) != need) {
 		if (newbuf)
-			preserve_errno(buf_put(a, buf));
+			buf_put(a, buf);
 		return NULL;
 	}
 	return buf;
@@ -177,6 +187,7 @@ int dealloc_blk(ALLOC * a, handle_t handle)
 		redirected = 1;
 		goto Retry;
 	default:
+		xerrno = FATAL_BLKTAG;
 		return -1;
 	}
 	atoms = len2atom(len);
@@ -210,6 +221,7 @@ int realloc_blk(ALLOC * a, handle_t handle, void *buf, size_t len)
 		redirected = 1;
 		goto Retry;
 	default:
+		xerrno = FATAL_BLKTAG;
 		return -1;
 	}
 	old_atoms = len2atom(olen);
@@ -293,7 +305,7 @@ int use_blk(ALLOC * a, handle_t h, void *buf, size_t len)
 		bzero(&b[3 + len], padding);
 	}
 	if (writeat(a->fd, b, need + padding, hdl2off(h)) != need + padding) {
-		preserve_errno(buf_put(a, b));
+		buf_put(a, b);
 		return -1;
 	}
 	buf_put(a, b);

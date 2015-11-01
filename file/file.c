@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #define _GNU_SOURCE
 
+#include "xerror.h"
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/types.h>
@@ -8,12 +9,18 @@
 
 ssize_t readat(int fd, void *buf, size_t count, off_t offset)
 {
-	return pread(fd, buf, count, offset);
+	ssize_t n = pread(fd, buf, count, offset);
+	if (n != count)
+		xerrno = FATAL_RIO;
+	return n;
 }
 
 ssize_t writeat(int fd, void *buf, size_t count, off_t offset)
 {
-	return pwrite(fd, buf, count, offset);
+	ssize_t n = pwrite(fd, buf, count, offset);
+	if (n != count)
+		xerrno = FATAL_WIO;
+	return n;
 }
 
 int alloc(int fd, off_t offset, off_t len)

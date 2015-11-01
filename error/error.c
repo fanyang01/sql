@@ -5,10 +5,20 @@
 
 char *__err_strings[] = {
 	[0] = "Success",
-	[FATAL_FSIZE] = "Invalid file size",
-	[FATAL_READLESS] = "Read less than expected length",
+	[FATAL_INVDB] = "Invalid or damaged DB file",
+	[FATAL_RIO] = "Read error",
+	[FATAL_WIO] = "Write error",
 	[FATAL_BLKSIZE] = "Wrong block size",
 	[FATAL_BLKTAG] = "Wrong block tag",
+	[FATAL_OFFSET] = "Invalid file offset",
+	[FATAL_NOMEM] = "Out of memory",
+	[FATAL_BLKNO] = "Unexpected block number",
+	[ERR_NCOL] = "Unmatched number of columns",
+	[ERR_COLTYPE] = "Unmatched column type",
+	[ERR_TOOLONG] = "String too long",
+	[ERR_DPCNAME] = "Duplicate column name",
+	[ERR_NPRIMARY] = "Incorrect number of primary key",
+	[ERR_DPTABLE] = "A table with the same name exists",
 };
 
 static pthread_once_t _errno_once = PTHREAD_ONCE_INIT;

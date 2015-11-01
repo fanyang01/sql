@@ -1,4 +1,5 @@
 #include "common.h"
+#include "xerror.h"
 #include "file.h"
 #include <endian.h>
 #include <arpa/inet.h>
@@ -48,8 +49,10 @@ off_t hdl2off(handle_t handle)
 
 handle_t off2hdl(off_t offset)
 {
-	if (offset < FLT_LEN)
+	if (offset < FLT_LEN) {
+		xerrno = FATAL_OFFSET;
 		return 0;
+	}
 	return (offset - FLT_LEN) / ATOM_LEN + 1;
 }
 

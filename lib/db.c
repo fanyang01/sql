@@ -45,8 +45,10 @@ DB *opendb(const char *path, int oflag, ...)
 
 	if (oflag & O_CREAT) {
 		bzero(buf, 7);
-		if (alloc_blk(&db->a, buf, 7) != 1)
+		if (alloc_blk(&db->a, buf, 7) != 1) {
+			xerrno = FATAL_BLKNO;
 			goto Error;
+		}
 	} else {
 		len = 7;
 		void *p = read_blk(&db->a, 1, buf, &len);
@@ -95,10 +97,13 @@ DB *_alloc_db(size_t pathlen)
 {
 	DB *db;
 
-	if ((db = calloc(1, sizeof(DB))) == NULL)
+	if ((db = calloc(1, sizeof(DB))) == NULL) {
+		xerrno = FATAL_NOMEM;
 		return NULL;
+	}
 	if ((db->name = malloc(pathlen + 1)) == NULL) {
 		free(db);
+		xerrno = FATAL_NOMEM;
 		return NULL;
 	}
 	return db;
@@ -172,14 +177,18 @@ int _validate_cols(const col_t * cols, int ncol)
 		return 0;
 	for (int i = 0; i < ncol; i++)
 		for (int j = i + 1; j < ncol; j++)
-			if (strcmp(cols[i].name, cols[j].name) == 0)
+			if (strcmp(cols[i].name, cols[j].name) == 0) {
+				xerrno = ERR_DPCNAME;
 				return 0;
+			}
 	int count = 0;
 	for (int i = 0; i < ncol; i++)
 		if (cols[i].unique == COL_PRIMARY)
 			count++;
-	if (count != 1)
+	if (count != 1) {
+		xerrno = ERR_NPRIMARY;
 		return 0;
+	}
 	return 1;
 }
 
@@ -187,8 +196,10 @@ int new_table(DB * db, const char *tname, const col_t * cols, int ncol)
 {
 	table_t *t;
 
-	if (db_find_table(db, tname) != NULL)
+	if (db_find_table(db, tname) != NULL) {
+		xerrno = ERR_DPTABLE;
 		return -1;
+	}
 	if (!_validate_cols(cols, ncol))
 		return -1;
 	if ((t = _alloc_table(tname, ncol)) == NULL)
@@ -209,7 +220,7 @@ int new_table(DB * db, const char *tname, const col_t * cols, int ncol)
 
 	return 0;
  Error:
-	_free_table(t);
+	preserve_errno(_free_table(t));
 	return -1;
 }
 

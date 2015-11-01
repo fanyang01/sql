@@ -13,15 +13,21 @@ static int _list_del_record(ALLOC * a, table_t * t, record_t * r);
 
 int validate_record(ALLOC * a, table_t * t, record_t * r)
 {
-	if (t->ncols != r->len)
+	if (t->ncols != r->len) {
+		xerrno = ERR_NCOL;
 		return 0;
+	}
 	for (int i = 0; i < t->ncols; i++)
-		if (t->cols[i].type != r->vals[i].type)
+		if (t->cols[i].type != r->vals[i].type) {
+			xerrno = ERR_COLTYPE;
 			return 0;
+		}
 	for (int i = 0; i < t->ncols; i++)
 		if (r->vals[i].type == TYPE_STRING)
-			if (strlen(r->vals[i].value.s) >= t->cols[i].size)
+			if (strlen(r->vals[i].value.s) >= t->cols[i].size) {
+				xerrno = ERR_TOOLONG;
 				return 0;
+			}
 	// TODO: validate the unique constraint
 	return 1;
 }
@@ -179,7 +185,8 @@ record_t *_alloc_record(table_t * t)
 	record_t *r;
 	char *p;
 
-	if ((r = malloc(sizeof(record_t) + t->ncols * sizeof(colv_t))) == NULL)
+	if ((r = calloc(1, sizeof(record_t) +
+			t->ncols * sizeof(colv_t))) == NULL)
 		return NULL;
 
 	for (int i = 0; i < t->ncols; i++) {
@@ -227,6 +234,7 @@ record_t *read_record(ALLOC * a, table_t * t, handle_t h)
 			strlcpy(r->vals[i].value.s, p, t->sizes[i]);
 			break;
 		default:
+			xerrno = FATAL_INVDB;
 			goto Error;
 		}
 	}
@@ -236,7 +244,7 @@ record_t *read_record(ALLOC * a, table_t * t, handle_t h)
 
  Error:
 	if (buf != NULL)
-		preserve_errno(buf_put(a, buf));
+		buf_put(a, buf);
 	preserve_errno(_free_record(r));
 	return NULL;
 }
@@ -271,7 +279,7 @@ int delete_record(ALLOC * a, table_t * t, handle_t h)
 		goto Error;
 	ret = 0;
  Error:
-	_free_record(r);
+	preserve_errno(_free_record(r));
 	return ret;
 
 }
@@ -287,7 +295,7 @@ int clear_table(ALLOC * a, table_t * t)
 			return -1;
 		h = r->next;
 		ret = delete_record(a, t, r->self);
-		_free_record(r);
+		preserve_errno(_free_record(r));
 		if (ret < 0)
 			return -1;
 	}
