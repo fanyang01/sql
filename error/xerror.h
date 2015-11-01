@@ -14,15 +14,20 @@ extern int *_errno_value(void);
 	errno = _err; xerrno = _xerr; \
 } while(0)
 
-#define ERR_FSIZE 1		// Invalid file size
-#define ERR_READLESS 2		// Read less than expected length
-#define ERR_BLKSIZE 3		// Wrong block size
-#define ERR_BLKTAG 4		// Wrong block tag
+#define return_if(cond, no) do { \
+	if(cond) { \
+		xerrno = (no); \
+		return -1; \
+	} \
+} while(0)
 
-#define xstrerror(no) (__err_strings[(no)])
+#define FATAL_FSIZE 1		// Invalid file size
+#define FATAL_READLESS 2		// Read less than expected length
+#define FATAL_BLKSIZE 3		// Wrong block size
+#define FATAL_BLKTAG 4		// Wrong block tag
+
 #define xperror(s) fprintf(stderr, "%s: %s\n", (s), __err_strings[xerrno])
 
 #define perror(s) do { if(errno) perror(s); if(xerrno) xperror(s); } while(0)
-#define strerror(no) (errno ? strerror(no) : xstrerror(no))
 
 #endif

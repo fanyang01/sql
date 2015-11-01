@@ -5,10 +5,10 @@
 
 char *__err_strings[] = {
 	[0] = "Success",
-	[ERR_FSIZE] = "Invalid file size",
-	[ERR_READLESS] = "Read less than expected length",
-	[ERR_BLKSIZE] = "Wrong block size",
-	[ERR_BLKTAG] = "Wrong block tag",
+	[FATAL_FSIZE] = "Invalid file size",
+	[FATAL_READLESS] = "Read less than expected length",
+	[FATAL_BLKSIZE] = "Wrong block size",
+	[FATAL_BLKTAG] = "Wrong block tag",
 };
 
 static pthread_once_t _errno_once = PTHREAD_ONCE_INIT;
