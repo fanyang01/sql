@@ -264,3 +264,22 @@ int _table_cols_marshal(ALLOC * a, table_t * t)
 	preserve_errno(buf_put(a, buf));
 	return ret;
 }
+
+int table_find_col(table_t * t, const char *colname)
+{
+	for (int i = 0; i < t->ncols; i++)
+		if (strcmp(t->cols[i].name, colname) == 0)
+			return i;
+	return -1;
+}
+
+int table_find_index(table_t * t, const char *iname)
+{
+	for (int i = 0; i < t->ncols; i++) {
+		if (t->cols[i].iname == NULL)
+			continue;
+		if (strcmp(t->cols[i].iname, iname) == 0)
+			return i;
+	}
+	return -1;
+}

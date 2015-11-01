@@ -9,6 +9,7 @@
 
 static DB *_alloc_db(size_t pathlen);
 static void _free_db(DB * db);
+static int _load_tables(DB * db);
 
 DB *opendb(const char *path, int oflag, ...)
 {
@@ -48,15 +49,34 @@ DB *opendb(const char *path, int oflag, ...)
 			goto Error;
 		if (len != 7)
 			goto Error;
-		db->db_root = b2hdl(p);
+		db->root = b2hdl(p);
 		if (p != buf)
 			buf_put(&db->a, p);
 	}
+	if (_load_tables(db) < 0)
+		goto Error;
+
 	return db;
 
  Error:
 	preserve_errno(_free_db(db));
 	return NULL;
+}
+
+int _load_tables(DB * db)
+{
+	handle_t h;
+	table_t *t, *prev = NULL;
+	table_t **pp = &db->thead;
+
+	for (h = db->root; h != 0; h = t->next) {
+		if ((t = read_table(&db->a, h)) == NULL)
+			return -1;
+		t->prev_table = prev;
+		*pp = prev = t;
+		pp = &t->next_table;
+	}
+	return 0;
 }
 
 void closedb(DB * db)
@@ -68,6 +88,7 @@ void closedb(DB * db)
 DB *_alloc_db(size_t pathlen)
 {
 	DB *db;
+
 	if ((db = calloc(1, sizeof(DB))) == NULL)
 		return NULL;
 	if ((db->name = malloc(pathlen + 1)) == NULL) {
@@ -79,7 +100,13 @@ DB *_alloc_db(size_t pathlen)
 
 void _free_db(DB * db)
 {
+	table_t *t, *next;
+
 	free(db->name);
+	for (t = db->thead; t != NULL; t = next) {
+		next = t->next_table;
+		_free_table(t);
+	}
 	free(db);
 }
 
@@ -95,4 +122,14 @@ int delete_table(ALLOC * a, table_t * t)
 		return -1;
 	_free_table(t);
 	return 0;
+}
+
+table_t *db_find_table(DB * db, const char *tname)
+{
+	table_t *t;
+
+	for (t = db->thead; t != NULL; t = t->next_table)
+		if (strcmp(t->name, tname) == 0)
+			return t;
+	return NULL;
 }

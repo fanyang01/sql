@@ -26,6 +26,7 @@ typedef struct {
 	handle_t index;
 } col_t;
 
+// table metadata, in-memory
 typedef struct table {
 	handle_t next;		// next table metadata
 	handle_t head;		// -> first record
@@ -75,5 +76,8 @@ extern void _free_table(table_t * t);
 extern handle_t alloc_table(ALLOC * a, table_t * t);
 extern table_t *read_table(ALLOC * a, handle_t h);
 extern int write_table(ALLOC * a, handle_t h, table_t * t);
+
+extern int table_find_col(table_t * t, const char *colname);
+extern int table_find_index(table_t * t, const char *iname);
 
 #endif

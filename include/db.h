@@ -11,12 +11,13 @@
 typedef struct {
 	ALLOC a;
 	char *name;
-	handle_t db_root;	// value at handle #1
+	handle_t root;		// value at handle #1, point to first table metadata
 	table_t *thead;
 } DB;
 
 extern DB *opendb(const char *path, int oflag, ...);
 extern void closedb(DB * db);
 extern int delete_table(ALLOC * a, table_t * t);
+extern table_t *db_find_table(DB * db, const char *tname);
 
 #endif

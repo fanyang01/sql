@@ -38,6 +38,7 @@ int main(void)
 	table_t *t = _alloc_table("test_table", 3);
 	assert(t != NULL);
 	strcpy(t->cols[0].name, "column1");
+	strcpy(t->cols[0].iname, "index1");
 	t->cols[0].type = TYPE_INT;
 	t->cols[0].unique = COL_PRIMARY;
 	strcpy(t->cols[1].name, "column2");
@@ -58,6 +59,11 @@ int main(void)
 	assert((h = alloc_table(a, t)) != 0);
 	assert((t3 = read_table(a, h)) != NULL);
 	assert(equal(t, t3));
+	assert(table_find_col(t3, "column") == -1);
+	assert(table_find_index(t3, "index1") == 0);
+	assert(table_find_col(t3, "column1") == 0);
+	assert(table_find_col(t3, "column2") == 1);
+	assert(table_find_col(t3, "column3") == 2);
 	_free_table(t3);
 
 	strcpy(t->name, "table");
