@@ -68,6 +68,9 @@
 #define ATOM_LEN 16
 #define FLT_LEN (FLT_SIZE * sizeof(handle_t))
 
+#define LRU_NSLOT 113		// a prime
+#define LRU_SIZE (1<<20)
+
 #define CTBLK_MAXSHORT 254
 #define CTBLK_MAXLONG 65533
 #define CTBLK_SHORT 0x1
@@ -77,9 +80,22 @@
 #define FRBLK_LONG 0x10
 
 typedef uint64_t handle_t;
+
+struct lru_node {
+	struct lru_node *hash_next;
+	struct lru_node *prev, *next;
+	handle_t self;
+	void *block;
+	size_t size;
+};
+
 typedef struct {
 	int fd;
 	handle_t flt[FLT_SIZE];
+	struct lru_node **lru;
+	struct lru_node *lru_head;
+	struct lru_node *lru_tail;
+	size_t lru_size;
 } ALLOC;
 
 /*

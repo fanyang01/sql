@@ -19,6 +19,10 @@ static int flt_idx(handle_t size);
 int init_allocator(ALLOC * a, int fd, int oflag)
 {
 	a->fd = fd;
+	if ((a->lru = calloc(LRU_NSLOT, sizeof(struct lru_node *))) == NULL) {
+		xerrno = FATAL_NOMEM;
+		return -1;
+	}
 	bzero(a->flt, FLT_LEN);
 	if (oflag & O_CREAT) {
 		if (ftruncate(fd, 0) == -1)
