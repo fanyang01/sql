@@ -6,10 +6,16 @@
 #include <strings.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <bsd/string.h>
 
+static int _load_tables(DB * db);
 static DB *_alloc_db(size_t pathlen);
 static void _free_db(DB * db);
-static int _load_tables(DB * db);
+static int _db_setroot(DB * db, table_t * t);
+static int _table_setnext(ALLOC * a, table_t * t, table_t * next);
+static int _list_add_table(DB * db, table_t * t);
+static int _list_remove_table(DB * db, table_t * t);
+static int _validate_cols(const col_t * cols, int ncol);
 
 DB *opendb(const char *path, int oflag, ...)
 {
@@ -110,15 +116,110 @@ void _free_db(DB * db)
 	free(db);
 }
 
-int delete_table(ALLOC * a, table_t * t)
+int _db_setroot(DB * db, table_t * t)
 {
-	if (clear_table(a, t) < 0)
+	unsigned char buf[7];
+
+	db->thead = t;
+	if (t == NULL)
+		db->root = 0;
+	else
+		db->root = t->self;
+	hdl2b(buf, db->root);
+	return realloc_blk(&db->a, 1, buf, sizeof(buf));
+}
+
+int _table_setnext(ALLOC * a, table_t * t, table_t * next)
+{
+	t->next_table = next;
+	if (next == NULL)
+		t->next = next->self;
+	else
+		t->next = 0;
+	return write_table(a, t->self, t);
+}
+
+// premise: t->next_table and t->prev_table has been set properly.
+int _list_add_table(DB * db, table_t * t)
+{
+	if (t->prev_table == NULL) {
+		if (_db_setroot(db, t) < 0)
+			return -1;
+	} else if (_table_setnext(&db->a, t->prev_table, t) < 0) {
 		return -1;
-	if (t->prev_table != NULL)
-		t->prev_table->next_table = t->next_table;
+	}
+	if (t->next_table != NULL)
+		t->next_table->prev_table = t;
+	return 0;
+}
+
+int _list_remove_table(DB * db, table_t * t)
+{
+	if (t->prev_table == NULL) {
+		if (_db_setroot(db, t->next_table) < 0)
+			return -1;
+	} else if (_table_setnext(&db->a, t->prev_table, t->next_table) < 0) {
+		return -1;
+	}
 	if (t->next_table != NULL)
 		t->next_table->prev_table = t->prev_table;
-	if (dealloc_blk(a, t->self) < 0)
+	return 0;
+}
+
+int _validate_cols(const col_t * cols, int ncol)
+{
+	if (ncol > MAXCOLS)
+		return 0;
+	for (int i = 0; i < ncol; i++)
+		for (int j = i + 1; j < ncol; j++)
+			if (strcmp(cols[i].name, cols[j].name) == 0)
+				return 0;
+	int count = 0;
+	for (int i = 0; i < ncol; i++)
+		if (cols[i].unique == COL_PRIMARY)
+			count++;
+	if (count != 1)
+		return 0;
+	return 1;
+}
+
+int new_table(DB * db, const char *tname, const col_t * cols, int ncol)
+{
+	table_t *t;
+
+	if (db_find_table(db, tname) != NULL)
+		return -1;
+	if (!_validate_cols(cols, ncol))
+		return -1;
+	if ((t = _alloc_table(tname, ncol)) == NULL)
+		return -1;
+
+	strlcpy(t->name, tname, NAMELEN + 1);
+	memcpy(t->cols, cols, ncol * sizeof(col_t));
+	t->next_table = db->thead;
+	if (db->thead != NULL)
+		t->next = db->thead->self;
+	else
+		t->next = 0;
+
+	if (alloc_table(&db->a, t) == 0)
+		goto Error;
+	if (_list_add_table(db, t) < 0)
+		goto Error;
+
+	return 0;
+ Error:
+	_free_table(t);
+	return -1;
+}
+
+int delete_table(DB * db, table_t * t)
+{
+	if (clear_table(&db->a, t) < 0)
+		return -1;
+	if (_list_remove_table(db, t) < 0)
+		return -1;
+	if (dealloc_blk(&db->a, t->self) < 0)
 		return -1;
 	_free_table(t);
 	return 0;

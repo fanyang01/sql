@@ -2,6 +2,8 @@
 #define _DB_H
 
 #include "alloc.h"
+#include "type.h"
+#include "common.h"
 #include "table.h"
 #include "record.h"
 #include <sys/types.h>
@@ -17,7 +19,8 @@ typedef struct {
 
 extern DB *opendb(const char *path, int oflag, ...);
 extern void closedb(DB * db);
-extern int delete_table(ALLOC * a, table_t * t);
+extern int new_table(DB * db, const char *tname, const col_t * cols, int ncol);
+extern int delete_table(DB * db, table_t * t);
 extern table_t *db_find_table(DB * db, const char *tname);
 
 #endif
