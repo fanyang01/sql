@@ -2,7 +2,17 @@
 #include "xerror.h"
 #include <stdlib.h>
 
-struct lru_node *lru_find(ALLOC * a, handle_t h)
+static struct lru_node *_lru_find(ALLOC * a, handle_t h);
+static void _list_add(ALLOC * a, struct lru_node *x);
+static void _list_remove(ALLOC * a, struct lru_node *x);
+static void _lru_mv2head(ALLOC * a, struct lru_node *x);
+static struct lru_node *_newnode();
+static void _freenode(ALLOC * a, struct lru_node *x);
+static void _hash_add(ALLOC * a, struct lru_node *x);
+static void _hash_del(ALLOC * a, handle_t h);
+static void _cache_shrink(ALLOC * a, size_t to);
+
+struct lru_node *_lru_find(ALLOC * a, handle_t h)
 {
 	int idx = h % LRU_NSLOT;
 	struct lru_node *x;
@@ -36,24 +46,24 @@ void _list_remove(ALLOC * a, struct lru_node *x)
 		a->lru_tail = x->prev;
 }
 
-void lru_mv2head(ALLOC * a, struct lru_node *x)
+void _lru_mv2head(ALLOC * a, struct lru_node *x)
 {
 	_list_remove(a, x);
 	_list_add(a, x);
 }
 
-struct lru_node *_new_lru_node()
+struct lru_node *_newnode()
 {
 	return calloc(1, sizeof(struct lru_node));
 }
 
-void _free_lru_node(ALLOC * a, struct lru_node *x)
+void _freenode(ALLOC * a, struct lru_node *x)
 {
 	buf_put(a, x->block);
 	free(x);
 }
 
-void _lru_hash_add(ALLOC * a, struct lru_node *x)
+void _hash_add(ALLOC * a, struct lru_node *x)
 {
 	int idx = x->self % LRU_NSLOT;
 
@@ -61,7 +71,7 @@ void _lru_hash_add(ALLOC * a, struct lru_node *x)
 	a->lru[idx] = x;
 }
 
-void _lru_hash_del(ALLOC * a, handle_t h)
+void _hash_del(ALLOC * a, handle_t h)
 {
 	int idx = h % LRU_NSLOT;
 	struct lru_node *x, **pp;
@@ -73,25 +83,25 @@ void _lru_hash_del(ALLOC * a, handle_t h)
 		}
 }
 
-void cache_shrink(ALLOC * a, size_t to)
+void _cache_shrink(ALLOC * a, size_t to)
 {
 	struct lru_node *x, *prev;
 	for (x = a->lru_tail; x != NULL && a->lru_size > to; x = prev) {
 		prev = x->prev;
-		_lru_hash_del(a, x->self);
+		_hash_del(a, x->self);
 		_list_remove(a, x);
 		a->lru_size -= x->size;
-		_free_lru_node(a, x);
+		_freenode(a, x);
 	}
 }
 
 int cache_set(ALLOC * a, handle_t h, void *buf, size_t len)
 {
-	cache_shrink(a, LRU_SIZE - len);
+	_cache_shrink(a, LRU_SIZE - len);
 
-	struct lru_node *x = lru_find(a, h);
+	struct lru_node *x = _lru_find(a, h);
 	if (x == NULL) {
-		if ((x = _new_lru_node()) == NULL) {
+		if ((x = _newnode()) == NULL) {
 			xerrno = FATAL_NOMEM;
 			return -1;
 		}
@@ -99,7 +109,7 @@ int cache_set(ALLOC * a, handle_t h, void *buf, size_t len)
 		x->self = h;
 		x->block = buf;
 		x->size = len;
-		_lru_hash_add(a, x);
+		_hash_add(a, x);
 		_list_add(a, x);
 		return 0;
 	}
@@ -109,18 +119,29 @@ int cache_set(ALLOC * a, handle_t h, void *buf, size_t len)
 	a->lru_size += len;
 	x->block = buf;
 	x->size = len;
-	lru_mv2head(a, x);
+	_lru_mv2head(a, x);
 
 	return 0;
 }
 
 void *cache_get(ALLOC * a, handle_t h, size_t * len)
 {
-	struct lru_node *x = lru_find(a, h);
+	struct lru_node *x = _lru_find(a, h);
 
 	if (x == NULL)
 		return NULL;
-	lru_mv2head(a, x);
+	_lru_mv2head(a, x);
 	*len = x->size;
 	return x->block;
+}
+
+void cache_del(ALLOC * a, handle_t h)
+{
+	struct lru_node *x = _lru_find(a, h);
+
+	if (x == NULL)
+		return;
+	a->lru_size -= x->size;
+	_list_remove(a, x);
+	_hash_del(a, x->self);
 }

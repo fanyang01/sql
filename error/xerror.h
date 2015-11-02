@@ -36,6 +36,8 @@ extern int *_errno_value(void);
 #define ERR_DPCNAME 0x14	// Duplicate column name
 #define ERR_NPRIMARY 0x15	// Incorrect number of primary key
 #define ERR_DPTABLE 0x16	// A table with the same name exists
+#define ERR_NOCOL 0x17		// Column not in table
+#define ERR_INVOP 0x18		// Invalid selection operator
 
 #define xperror(s) fprintf(stderr, "%s: %s\n", (s), __err_strings[xerrno])
 #define perror(s) do { if(errno) perror(s); if(xerrno) xperror(s); } while(0)

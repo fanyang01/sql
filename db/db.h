@@ -1,11 +1,14 @@
 #ifndef _DB_H
 #define _DB_H
 
+#include "xerror.h"
 #include "alloc.h"
 #include "type.h"
 #include "common.h"
 #include "table.h"
 #include "record.h"
+#include "stmt.h"
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
