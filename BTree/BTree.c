@@ -1,17 +1,16 @@
 //imxian(imkzy@foxmail.com)
-//This version only supports the unique value, and is very inefficient due to fixed key length. :(
-//just for reference and debug.
+//This version supports the non-unique key.
 #include "BTree.h"
 #include <string.h>
 #include <time.h>
 #include <assert.h>
 //#include <stdio.h>
 
-//malloc btree space in file and set the root adderss 0
+//malloc btree space in file and set the root address 0
 static handle_t newBTree(ALLOC *store);
 //get the root address
 static handle_t getRoot(BTree *bt);
-//set the new root adderss
+//set the new root address
 static void flushRoot(BTree *bt, handle_t ph);
 //free the node and its children
 static void clearNode(BTree *bt, handle_t ph);
@@ -41,6 +40,12 @@ static void shiftLeft(btree_node *p);
 static void shiftRight(btree_node *p);
 //delete Ki/Pi+1 in the node
 static void moveLeft(btree_node *p, int i);
+//compare handle_t
+static int cmpHandle(const void *a, const void *b);
+//compare key
+static int keyCmp(BTree *bt, const void *a, const void *b);
+//merge pointer and key as a new key if needed
+static void convertKey(BTree *bt, const void *key, handle_t value, uint8_t *Key);
 
 /*
 void pout(btree_node * child){
@@ -51,23 +56,25 @@ void pout(btree_node * child){
 }
 */
 
-handle_t CreateBTree(BTree *bt, ALLOC *store, CMP collate) {
+handle_t CreateBTree(BTree *bt, ALLOC *store, uint8_t isUnique, CMP collate) {
     bt->store = store;
+    bt->isUnique = isUnique;
     bt->collate = collate;
     bt->root = newBTree(store);
     bt->iroot = 0;
     return bt->root;
 }
 
-static uint8_t zeros[8];
+static uint8_t zeros[sizeof(handle_t)];
 handle_t newBTree(ALLOC *store) {
-    handle_t t = alloc_blk(store, zeros, 8);
+    handle_t t = alloc_blk(store, zeros, sizeof(handle_t));
     assert(t > 0);
     return t;
 }
 
-void OpenBTree(BTree *bt, ALLOC *store, CMP collate, handle_t handle) {
+void OpenBTree(BTree *bt, ALLOC *store, uint8_t isUnique, CMP collate, handle_t handle) {
     bt->store = store;
+    bt->isUnique = isUnique;
     bt->collate = collate;
     bt->root = handle;
     bt->iroot = getRoot(bt);
@@ -83,7 +90,7 @@ handle_t getRoot(BTree *bt) {
 }
 
 void flushRoot(BTree *bt, handle_t ph) {
-    realloc_blk(bt->store, bt->root, &ph, 8);
+    realloc_blk(bt->store, bt->root, &ph, sizeof(handle_t));
     bt->iroot = ph;
 }
 
@@ -224,7 +231,8 @@ void insertKey(BTree *bt, handle_t ph, void *key, handle_t value) {
 void SetKey(BTree *bt, const void *key, handle_t value) {
     if (bt == NULL) return;
     uint8_t Key[KEY_LENGTH];
-    memcpy(Key, key, KEY_LENGTH);
+    convertKey(bt, key, value, Key);
+    //memcpy(Key, key, KEY_LENGTH);
     handle_t left_child, right_child;
     if (bt->iroot != 0) {
         insertKey(bt, bt->iroot, Key, value);
@@ -393,10 +401,12 @@ void eraseKey(BTree *bt, handle_t ph, const void *key) {
 
 
 
-void DeleteKey(BTree *bt, const void *key) {
+void DeleteKey(BTree *bt, const void *key, handle_t value) {
     if (bt == NULL) return;
     if (bt->iroot == 0) return;
-    eraseKey(bt, bt->iroot, key);
+    uint8_t Key[KEY_LENGTH];
+    convertKey(bt, key, value, Key);
+    eraseKey(bt, bt->iroot, Key);
     btree_node *p = getNode(bt, bt->iroot);
     //pout(p);
     //printf("%d\n", p->size);
@@ -435,35 +445,37 @@ int findKey(BTree *bt, btree_node *p, const void *key, int *index) {
     int r = p->size;
     while (l + 1 < r) {
         int mid = (l + r) >> 1;
-        int ret = bt->collate(p->items[mid].key, key);
+        int ret = keyCmp(bt, p->items[mid].key, key);
         if (ret < 0) l = mid;
         else r = mid;
     }
     *index = r;
-    return bt->collate(p->items[*index].key, key) == 0;
+    return keyCmp(bt, p->items[*index].key, key) == 0;
 }
 
 void EnumLower_bound(BTreeEnum *bte, BTree *bt, const void *key) {
     EnumEnd(bte, bt);
     if(bt == NULL) return;
     if(bt->iroot == 0) return; 
+    uint8_t Key[KEY_LENGTH];
+    convertKey(bt, key, 0, Key);
     handle_t ph = bt->iroot;
-    int isHit, index;
+    int isHit, index, flag = 0;
     while (1) {
         btree_node *p = getNode(bt, ph);
-        isHit = findKey(bt, p, key, &index);
+        isHit = findKey(bt, p, Key, &index);
         if (p->isLeaf) {
             if(index == p->size) {
-                bte->id = 0;
-                putNode(bt, p);
-                return;
+                flag = 1;
+                index--;
             }
             bte->store = bt->store;
             bte->id = ph;
             bte->index = index;
-            memcpy(bte->key, p->items[index].key, sizeof(bte->key));
+            memcpy(bte->key, p->items[index].key, KEY_LENGTH);
             bte->value = p->items[index].child;
             putNode(bt, p);
+            if (flag) MoveNext(bte);
             break;
         }
         if (isHit) index++;
@@ -488,7 +500,7 @@ void EnumBegin(BTreeEnum *bte, BTree *bt) {
             bte->store = bt->store;
             bte->id = ph;
             bte->index = 0;
-            memcpy(bte->key, p->items[0].key, sizeof(bte->key));
+            memcpy(bte->key, p->items[0].key, KEY_LENGTH);
             //printf("%d\n", sizeof(bte->key));
             //printf("%d\n", sizeof(p->items[0].key));
             bte->value = p->items[0].child;
@@ -504,6 +516,7 @@ void EnumEnd(BTreeEnum *bte, BTree *bt) {
     bte->store = 0;
     bte->id = 0;
     bte->index = 0;
+    bte->isUnique = bt->isUnique;
 }
 
 void MoveNext(BTreeEnum *bte) {
@@ -544,7 +557,10 @@ int IsEqual(BTreeEnum *x, BTreeEnum *y) {
 }
 
 const uint8_t *BTKey(BTreeEnum *bte) {
-    if (IsValid(bte)) return bte->key;
+    if (IsValid(bte)) {
+        if (bte->isUnique) return bte->key;
+        else return bte->key+sizeof(handle_t);
+    }
     else return NULL;
 }
 
@@ -572,4 +588,34 @@ int cmpFloat(const void *a, const void *b) {
 int cmpStr(const void *a, const void *b) {
     return strcmp(a, b);
 }
+
+int cmpHandle(const void *a, const void *b) {
+    const handle_t *x = a;
+    const handle_t *y = b;
+    if (*x == *y) return 0;
+    else if (*x < *y) return -1;
+    else return 1;
+}
+
+int keyCmp(BTree *bt, const void *a, const void *b) {
+    if (bt->isUnique) {
+        return bt->collate(a, b);
+    }
+    else {
+        int ret = bt->collate((handle_t *)a + 1, (handle_t *)b + 1);
+        if (ret == 0) return cmpHandle(a, b);
+        else return ret;
+    }
+}
+
+void convertKey(BTree *bt, const void *key, handle_t value, uint8_t *Key) {
+    if (bt->isUnique) {
+        memcpy(Key, key, KEY_LENGTH-sizeof(handle_t));
+    }
+    else {
+        memcpy(Key, &value, sizeof(handle_t));
+        memcpy(Key+sizeof(handle_t), key, KEY_LENGTH-sizeof(handle_t));
+    }
+}
+
 
