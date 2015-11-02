@@ -1,72 +1,90 @@
+//imxian(imkzy@foxmail.com)
+//This version only supports the unique value, and is very inefficient due to fixed key length. :(
+//just for reference and debug.
 #ifndef _BTREE_H
 #define _BTREE_H
-#include <string.h>
 #include "alloc.h"
-#include "common.h"
-//#include "xerror.h"
 
 typedef int (*CMP)(const void *a, const void *b);
-int cmpInt(const void *a, const void *b);
-int cmpFloat(const void *a, const void *b);
-int cmpStr(const void *a, const void *b);
-//...
+extern int cmpInt(const void *a, const void *b);
+extern int cmpFloat(const void *a, const void *b);
+extern int cmpStr(const void *a, const void *b);
 
 typedef struct btree_item btree_item;
 typedef struct btree_node btree_node;
 typedef struct BTree BTree;
 typedef struct BTreeEnum BTreeEnum;
 
-#define KEY_LENGTH	126
+#define KEY_LENGTH 256
 struct btree_item {
-	handle_t child;
-	uint8_t key[KEY_LENGTH];
+    handle_t child;
+    uint8_t key[KEY_LENGTH];
 } __attribute__((packed));
 
-#define NODE_SIZE ((4096 - 2) / sizeof(struct btree_item))
-#define M (NODE_SIZE-1)
+#define NODE_SIZE ((4096 - 5) / sizeof(struct btree_item))
+#define TABLE_SIZE (NODE_SIZE-2) 
+/* struct btree_node 
+ * m = TABLE_SIZE
+ * +--+--+--+----+----+--+--+----+
+ * |p0|k0|p1|....|Km-1|Pm|km|Pm+1|
+ * +--+--+--+----+----+--++++----+
+ * if it's a leaf node, pm+1 -> next leaf node;
+ * Pm/Km is used for insertion
+ */
 struct btree_node {
-    uint8_t tag;
-	uint8_t size;
-	struct btree_item items[NODE_SIZE];
-    //handle_t prev, next;
+    uint8_t isLeaf; //isLeaf = 1, leaf node; isLeaf = 0, nonleaf node;
+    uint32_t size;  //the current sum of key stored
+    struct btree_item items[NODE_SIZE]; //store pointer and key
 } __attribute__((packed));
 
 struct BTree{
-    ALLOC *store;
-    handle_t root;
-    handle_t iroot;
-    CMP collate;
-    //uint64_t serial;
+    ALLOC *store; //fileno
+    handle_t root; //pointer point to the root
+    handle_t iroot; //real root address
+    CMP collate; //compare function, use for comparing keys
 };
 
 struct BTreeEnum {
-    ALLOC *store;
-    handle_t id;
-    int index;
-	uint8_t key[KEY_LENGTH];
-    handle_t value;
-    //uint64_t serial;
+    ALLOC *store; //fileno
+    handle_t id; //which node
+    int index; // which key in this node
+    uint8_t key[KEY_LENGTH]; //key
+    handle_t value; //value
 };
 
-//using the follow function, you should malloc the struct BTree and BTreeEnum firstly.
+//to use the following function, you should malloc the space for struct BTree and BTreeEnum firstly!
+//Create a Btree
 extern handle_t CreateBTree(BTree *bt, ALLOC *store, CMP collate);
 //OpenBTree by the handle_t got from CreateBTree.
 extern void OpenBTree(BTree *bt, ALLOC *store, CMP collate, handle_t handle);
+//clear the whole Btree
 extern void ClearBTree(BTree *bt);
-extern void SetKey(BTree *bt, void *key, handle_t value);
-extern handle_t GetKey(BTree *bt, void *key);
-extern void DeleteKey(BTree *bt, void *key);
+//set the key/value
+extern void SetKey(BTree *bt, const void *key, handle_t value);
+//get the value by key
+extern handle_t GetKey(BTree *bt, const void *key);
+//delete the key/value
+extern void DeleteKey(BTree *bt, const void *key);
 
-
+//all the function below may return an invalid enumerator,
+//you should check it using IsValid() or compare with EnumEnd() using IsEqual()!
 extern int IsValid(BTreeEnum *bte);
-//return value = 1, bte->key = key; value=0, bte->key>key or not found;
-extern int EnumLower_bound(BTreeEnum *bte, BTree *bt, const void *key); //>=key
+//return the first enumerator whose key >= input key
+extern void EnumLower_bound(BTreeEnum *bte, BTree *bt, const void *key); //>=key
+//return the first enumerator whose key > input key
+extern void EnumUpper_bound(BTreeEnum *bte, BTree *bt, const void *key); //>key
+//return the smallest key/pointer
 extern void EnumBegin(BTreeEnum *bte, BTree *bt);
+//EnumEnd() just returns the invalid enumerator for IsEqual()
 extern void EnumEnd(BTreeEnum *bte, BTree *bt);
-//return value = 1, equals; = 0, dong't equals
+//return value = 1, equals; value = 0, don't equals
 extern int IsEqual(BTreeEnum *x, BTreeEnum *y);
+//take the next key/pointer
 extern void MoveNext(BTreeEnum *bte);
+//return the key, it is just bte->key
 extern const uint8_t *BTKey(BTreeEnum *bte);
+//return the value, it is just bte->value
 extern const handle_t BTValue(BTreeEnum *bte);
+
 #endif
 
