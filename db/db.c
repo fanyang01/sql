@@ -242,7 +242,7 @@ int _delete_table(DB * db, table_t * t)
 		return -1;
 	for (int i = 0; i < t->ncols; i++)
 		if (t->cols[i].index != 0)
-			if (delete_index(t->cols[i].idx) < 0)
+			if (delete_index(&db->a, t, i) < 0)
 				return -1;
 
 	if (_list_remove_table(db, t) < 0)
@@ -273,10 +273,6 @@ int create_index(DB * db, const char *tname, const char *colname,
 		xerrno = ERR_NOTABLE;
 		return -1;
 	}
-	if ((i = table_find_col(t, colname)) < 0) {
-		xerrno = ERR_NOCOL;
-		return -1;
-	}
 	for (t = db->thead; t != NULL; t = t->next_table)
 		for (int i = 0; i < t->ncols; i++)
 			if (strcmp(t->cols[i].iname, iname) == 0) {
@@ -284,7 +280,11 @@ int create_index(DB * db, const char *tname, const char *colname,
 				return -1;
 			}
 
-	if (new_index(&db->a, t, colname) < 0)
+	if ((i = table_find_col(t, colname)) < 0) {
+		xerrno = ERR_NOCOL;
+		return -1;
+	}
+	if (new_index(&db->a, t, i) < 0)
 		return -1;
 	strlcpy(t->cols[i].iname, iname, NAMELEN + 1);
 	return write_table(&db->a, t->self, t);
@@ -292,23 +292,12 @@ int create_index(DB * db, const char *tname, const char *colname,
 
 int drop_index(DB * db, const char *iname)
 {
-	index_t *idx = NULL;
 	table_t *t;
-	int i;
 
 	for (t = db->thead; t != NULL; t = t->next_table)
-		for (i = 0; i < t->ncols; i++)
-			if (strcmp(t->cols[i].iname, iname) == 0) {
-				idx = t->cols[i].idx;
-				return -1;
-			}
-	if (idx == NULL) {
-		xerrno = ERR_NOIDX;
-		return -1;
-	}
-	if (delete_index(idx) < 0)
-		return -1;
-	bzero(t->cols[i].iname, NAMELEN + 1);
-	t->cols[i].index = 0;
-	return write_table(&db->a, t->self, t);
+		for (int i = 0; i < t->ncols; i++)
+			if (strcmp(t->cols[i].iname, iname) == 0)
+				return delete_index(&db->a, t, i);
+	xerrno = ERR_NOIDX;
+	return -1;
 }

@@ -2,6 +2,37 @@
 #include "record.h"
 #include "xerror.h"
 #include <stdlib.h>
+#include <strings.h>
+
+static CMP _collate_of(int type);
+static int _is_unique_col(int flag);
+static const void *_index_value_ptr(colv_t * val);
+
+CMP _collate_of(int type)
+{
+	switch (type) {
+	case TYPE_INT:
+		return cmpInt;
+	case TYPE_FLOAT:
+		return cmpFloat;
+	case TYPE_STRING:
+		return cmpStr;
+	}
+	abort();
+}
+
+int _is_unique_col(int flag)
+{
+	switch (flag) {
+	case COL_PRIMARY:
+	case COL_UNIQUE:
+		return 1;
+		break;
+	case COL_NORMAL:
+		return 0;
+	}
+	abort();
+}
 
 const void *_index_value_ptr(colv_t * val)
 {
@@ -16,41 +47,25 @@ const void *_index_value_ptr(colv_t * val)
 	abort();
 }
 
-index_t *open_index(ALLOC * a, handle_t h, int type)
+int open_index(ALLOC * a, table_t * t, int i)
 {
 	index_t *idx = calloc(1, sizeof(index_t));
 
 	if (idx == NULL) {
 		xerrno = FATAL_NOMEM;
-		return NULL;
-	}
-
-	switch (type) {
-	case TYPE_INT:
-		OpenBTree(idx, a, cmpInt, h);
-		break;
-	case TYPE_FLOAT:
-		OpenBTree(idx, a, cmpFloat, h);
-		break;
-	case TYPE_STRING:
-		OpenBTree(idx, a, cmpStr, h);
-		break;
-	}
-	return idx;
-}
-
-// colname must be validated.
-int new_index(ALLOC * a, table_t * t, const char *colname)
-{
-	int i;
-	index_t *idx;
-	CMP collate;
-	handle_t root, h, next;
-
-	if ((i = table_find_col(t, colname)) < 0) {
-		xerrno = ERR_NOCOL;
 		return -1;
 	}
+	OpenBTree(idx, a, _is_unique_col(t->cols[i].unique),
+		  _collate_of(t->cols[i].type), t->cols[i].index);
+	t->cols[i].idx = idx;
+	return 0;
+}
+
+int new_index(ALLOC * a, table_t * t, int i)
+{
+	index_t *idx;
+	handle_t root, h, next;
+
 	if (t->cols[i].index != 0) {
 		xerrno = ERR_DPIDX;
 		return -1;
@@ -60,19 +75,11 @@ int new_index(ALLOC * a, table_t * t, const char *colname)
 		xerrno = FATAL_NOMEM;
 		return -1;
 	}
-	switch (t->cols[i].type) {
-	case TYPE_INT:
-		collate = cmpInt;
-		break;
-	case TYPE_FLOAT:
-		collate = cmpFloat;
-		break;
-	case TYPE_STRING:
-		collate = cmpStr;
-		break;
-	}
-	if ((root = CreateBTree(idx, a, collate)) == 0)
+
+	if ((root = CreateBTree(idx, a, _is_unique_col(t->cols[i].unique),
+				_collate_of(t->cols[i].type))) == 0)
 		goto Error;
+
 	// index records already in table
 	record_t *r;
 	for (h = t->head; h != 0; h = next) {
@@ -91,11 +98,14 @@ int new_index(ALLOC * a, table_t * t, const char *colname)
 	return -1;
 }
 
-int delete_index(index_t * idx)
+int delete_index(ALLOC * a, table_t * t, int i)
 {
-	ClearBTree(idx);
-	free(idx);
-	return 0;
+	ClearBTree(t->cols[i].idx);
+	free(t->cols[i].idx);
+	t->cols[i].idx = NULL;
+	t->cols[i].index = 0;
+	bzero(t->cols[i].iname, NAMELEN + 1);
+	return write_table(a, t->self, t);
 }
 
 void index_set(index_t * idx, record_t * r, int i)
@@ -108,9 +118,9 @@ handle_t index_get(index_t * idx, colv_t * val)
 	return GetKey(idx, _index_value_ptr(val));
 }
 
-void index_del(index_t * idx, colv_t * val)
+void index_del(index_t * idx, colv_t * val, handle_t h)
 {
-	DeleteKey(idx, _index_value_ptr(val));
+	DeleteKey(idx, _index_value_ptr(val), h);
 }
 
 int index_exist(index_t * idx, colv_t * val)

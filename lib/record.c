@@ -368,7 +368,7 @@ int delete_record(ALLOC * a, table_t * t, handle_t h)
 
 	for (int i = 0; i < t->ncols; i++)
 		if (t->cols[i].index != 0)
-			index_del(t->cols[i].idx, &r->vals[i]);
+			index_del(t->cols[i].idx, &r->vals[i], r->self);
 
 	if (_list_del_record(a, t, r) < 0)
 		goto Error;

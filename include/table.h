@@ -77,6 +77,7 @@ extern void *b2table(void *buf, table_t * t);
 extern table_t *_alloc_table(const char *name, int ncols);
 extern void _free_table(table_t * t);
 
+// using t->ncols and t->cols to create new table
 extern handle_t alloc_table(ALLOC * a, table_t * t);
 extern table_t *read_table(ALLOC * a, handle_t h);
 extern int write_table(ALLOC * a, handle_t h, table_t * t);

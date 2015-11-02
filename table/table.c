@@ -195,8 +195,7 @@ int _table_cols_unmarshal(ALLOC * a, table_t * t)
 	for (i = 0; i < t->ncols; i++) {
 		if (t->cols[i].index == 0)
 			continue;
-		if ((t->cols[i].idx =
-		     open_index(a, t->cols[i].index, t->cols[i].type)) == NULL)
+		if (open_index(a, t, i) < 0)
 			return -1;
 	}
 
@@ -205,12 +204,23 @@ int _table_cols_unmarshal(ALLOC * a, table_t * t)
 
 handle_t alloc_table(ALLOC * a, table_t * t)
 {
-	unsigned char buf[TABLE_MAXLEN];
+	unsigned char buf[TABLE_MAXLEN], *p;
 	size_t len;
+	int i;
 
-	len = 7 * t->ncols;
-	bzero(buf, sizeof(buf));
-	if ((t->hxroots = alloc_blk(a, buf, len)) == 0)
+	for (i = 0; i < t->ncols; i++)
+		if (t->cols[i].unique == COL_PRIMARY) {
+			if (new_index(a, t, i) < 0)
+				return 0;
+			snprintf(t->cols[i].iname, NAMELEN + 1,
+				 "auto_index_%s_%s", t->name, t->cols[i].name);
+		}
+	// _table_cols_marshal realloc block pointed by hxroots, so alloc it here
+	// buf is much larger
+	p = buf;
+	for (i = 0; i < t->ncols; i++)
+		p = hdl2b(p, t->cols[i].index);
+	if ((t->hxroots = alloc_blk(a, buf, p - buf)) == 0)
 		return 0;
 
 	if (_table_cols_marshal(a, t) < 0)
