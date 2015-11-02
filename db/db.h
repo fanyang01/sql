@@ -7,6 +7,7 @@
 #include "common.h"
 #include "table.h"
 #include "record.h"
+#include "index.h"
 #include "stmt.h"
 
 #include <sys/types.h>

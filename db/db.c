@@ -1,6 +1,4 @@
 #include "db.h"
-#include "xerror.h"
-#include "common.h"
 #include <stdarg.h>
 #include <string.h>
 #include <strings.h>
@@ -173,13 +171,15 @@ int _list_remove_table(DB * db, table_t * t)
 
 int _validate_cols(const col_t * cols, int ncol)
 {
-	if (ncol > MAXCOLS)
-		return 0;
+	if (ncol > MAXCOLS) {
+		xerrno = ERR_TMNCOL;
+		return -1;
+	}
 	for (int i = 0; i < ncol; i++)
 		for (int j = i + 1; j < ncol; j++)
 			if (strcmp(cols[i].name, cols[j].name) == 0) {
 				xerrno = ERR_DPCNAME;
-				return 0;
+				return -1;
 			}
 	int count = 0;
 	for (int i = 0; i < ncol; i++)
@@ -187,9 +187,9 @@ int _validate_cols(const col_t * cols, int ncol)
 			count++;
 	if (count != 1) {
 		xerrno = ERR_NPRIMARY;
-		return 0;
+		return -1;
 	}
-	return 1;
+	return 0;
 }
 
 int new_table(DB * db, const char *tname, const col_t * cols, int ncol)
@@ -200,7 +200,7 @@ int new_table(DB * db, const char *tname, const col_t * cols, int ncol)
 		xerrno = ERR_DPTABLE;
 		return -1;
 	}
-	if (!_validate_cols(cols, ncol))
+	if (_validate_cols(cols, ncol) < 0)
 		return -1;
 	if ((t = _alloc_table(tname, ncol)) == NULL)
 		return -1;
@@ -228,6 +228,11 @@ int delete_table(DB * db, table_t * t)
 {
 	if (clear_table(&db->a, t) < 0)
 		return -1;
+	for (int i = 0; i < t->ncols; i++)
+		if (t->cols[i].index != 0)
+			if (delete_index(t->cols[i].idx) < 0)
+				return -1;
+
 	if (_list_remove_table(db, t) < 0)
 		return -1;
 	if (dealloc_blk(&db->a, t->self) < 0)

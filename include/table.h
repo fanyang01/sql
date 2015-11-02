@@ -4,6 +4,7 @@
 #include "alloc.h"
 #include "common.h"
 #include "type.h"
+#include "BTree.h"
 
 #define NAMELEN 32
 #define MAXCOLS 32
@@ -18,12 +19,15 @@
 #define COL_UNIQUE 'u'
 #define COL_NORMAL 'n'
 
+typedef BTree index_t;
+
 typedef struct {
 	char name[NAMELEN + 1];
 	char iname[NAMELEN + 1];
 	char type, unique;
 	unsigned char size;
 	handle_t index;
+	index_t *idx;
 } col_t;
 
 // table metadata, in-memory

@@ -4,6 +4,7 @@
 #include "alloc.h"
 #include "type.h"
 #include "xerror.h"
+#include "index.h"
 #include <bsd/string.h>
 #include <strings.h>
 
@@ -94,8 +95,12 @@ void _free_table(table_t * t)
 		free(t->indices);
 	if (t->sizes != NULL)
 		free(t->sizes);
-	if (t->cols != NULL)
+	if (t->cols != NULL) {
+		for (int i = 0; i < t->ncols; i++)
+			if (t->cols[i].idx != NULL)
+				free(t->cols[i].idx);
 		free(t->cols);
+	}
 }
 
 table_t *read_table(ALLOC * a, handle_t h)
@@ -185,6 +190,15 @@ int _table_cols_unmarshal(ALLOC * a, table_t * t)
 		p += 7;
 	}
 	buf_put(a, buf);
+
+	// read indices
+	for (i = 0; i < t->ncols; i++) {
+		if (t->cols[i].index == 0)
+			continue;
+		if ((t->cols[i].idx =
+		     open_index(a, t->cols[i].index, t->cols[i].type)) == NULL)
+			return -1;
+	}
 
 	return 0;
 }

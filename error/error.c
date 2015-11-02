@@ -19,6 +19,11 @@ char *__err_strings[] = {
 	[ERR_DPCNAME] = "Duplicate column name",
 	[ERR_NPRIMARY] = "Incorrect number of primary key",
 	[ERR_DPTABLE] = "A table with the same name exists",
+	[ERR_NOCOL] = "Column not in table",
+	[ERR_INVOP] = "Invalid selection operator",
+	[ERR_DPIDX] = "An index on this column exists",
+	[ERR_UNIQ] = "Not meet the unique constraint",
+	[ERR_TMNCOL] = "Too many columns",
 };
 
 static pthread_once_t _errno_once = PTHREAD_ONCE_INIT;

@@ -1,9 +1,13 @@
 #include "record.h"
 #include "type.h"
 #include "xerror.h"
+#include "index.h"
 #include <bsd/string.h>
+#include <stdlib.h>
+#include <string.h>
 
-static int validate_record(ALLOC * a, table_t * t, record_t * r);
+static int _equal(colv_t * x, colv_t * y);
+static int _validate_record(ALLOC * a, table_t * t, record_t * r);
 static size_t _sizeof_record(table_t * t, record_t * r);
 static void *record2b(void *buf, table_t * t, record_t * r);
 static int _record_setprev(ALLOC * a, handle_t h, handle_t prev);
@@ -11,25 +15,70 @@ static int _record_setnext(ALLOC * a, handle_t h, handle_t next);
 static int _list_add_record(ALLOC * a, table_t * t, record_t * r);
 static int _list_del_record(ALLOC * a, table_t * t, record_t * r);
 
-int validate_record(ALLOC * a, table_t * t, record_t * r)
+int _equal(colv_t * x, colv_t * y)
+{
+	switch (x->type) {
+	case TYPE_INT:
+		return x->value.i == y->value.i;
+	case TYPE_FLOAT:
+		return x->value.f == y->value.f;
+	case TYPE_STRING:
+		return strcmp(x->value.s, y->value.s) == 0;
+	}
+	abort();
+}
+
+int _validate_record(ALLOC * a, table_t * t, record_t * r)
 {
 	if (t->ncols != r->len) {
 		xerrno = ERR_NCOL;
-		return 0;
+		return -1;
 	}
 	for (int i = 0; i < t->ncols; i++)
 		if (t->cols[i].type != r->vals[i].type) {
 			xerrno = ERR_COLTYPE;
-			return 0;
+			return -1;
 		}
 	for (int i = 0; i < t->ncols; i++)
 		if (r->vals[i].type == TYPE_STRING)
 			if (strlen(r->vals[i].value.s) >= t->cols[i].size) {
 				xerrno = ERR_TOOLONG;
-				return 0;
+				return -1;
 			}
-	// TODO: validate the unique constraint
-	return 1;
+	return 0;
+}
+
+int _validate_unique(ALLOC * a, table_t * t, record_t * r)
+{
+	for (int i = 0; i < t->ncols; i++) {
+		if (t->cols[i].unique == COL_NORMAL)
+			continue;
+		// primary or unique
+		// use index
+		if (t->cols[i].index != 0) {
+			if (index_exist(t->cols[i].idx, &r->vals[i])) {
+				xerrno = ERR_UNIQ;
+				return -1;
+			}
+			continue;
+		}
+		// full scan
+		for (handle_t h = t->head; h != 0;) {
+			record_t *x;
+			int eq;
+
+			if ((x = read_record(a, t, h)) == NULL)
+				return -1;
+			h = x->next;
+			eq = _equal(&x->vals[i], &r->vals[i]);
+			_free_record(x);
+			if (eq) {
+				xerrno = ERR_UNIQ;
+				return -1;
+			}
+		}
+	}
+	return 0;
 }
 
 size_t _sizeof_record(table_t * t, record_t * r)
@@ -157,12 +206,13 @@ int _list_del_record(ALLOC * a, table_t * t, record_t * r)
 	return 0;
 }
 
+// TODO
 handle_t alloc_record(ALLOC * a, table_t * t, record_t * r)
 {
 	unsigned char *buf, *p;
 	handle_t h = 0;
 
-	if (!validate_record(a, t, r))
+	if (_validate_record(a, t, r) < 0 || _validate_unique(a, t, r) < 0)
 		return 0;
 	if ((buf = buf_get(a, _sizeof_record(t, r))) == NULL)
 		return 0;
@@ -177,6 +227,11 @@ handle_t alloc_record(ALLOC * a, table_t * t, record_t * r)
 	r->self = h;
 	if (_list_add_record(a, t, r) < 0)
 		return 0;
+
+	for (int i = 0; i < t->ncols; i++)
+		if (t->cols[i].index != 0)
+			index_set(t->cols[i].idx, r, i);
+
 	return h;
 }
 
@@ -249,21 +304,58 @@ record_t *read_record(ALLOC * a, table_t * t, handle_t h)
 	return NULL;
 }
 
+// TODO: validate the unique constraint
 int update_record(ALLOC * a, table_t * t, handle_t h, record_t * r)
 {
 	unsigned char *buf, *p;
+	record_t *old;
 	size_t len = 0;
 	int ret;
 
-	if (!validate_record(a, t, r))
+	if (_validate_record(a, t, r) < 0)
 		return -1;
+	if ((old = read_record(a, t, h)) == NULL)
+		return -1;
+
+	for (int i = 0; i < t->ncols; i++) {
+		if (t->cols[i].unique == COL_NORMAL)
+			continue;
+		if (_equal(&old->vals[i], &r->vals[i]))
+			continue;
+		if (t->cols[i].index != 0) {
+			if (index_exist(t->cols[i].idx, &r->vals[i])) {
+				xerrno = ERR_UNIQ;
+				goto Error;
+			}
+			continue;
+		}
+		for (handle_t h = t->head; h != 0;) {
+			record_t *x;
+			int eq;
+
+			if ((x = read_record(a, t, h)) == NULL)
+				goto Error;
+			h = x->next;
+			eq = _equal(&x->vals[i], &r->vals[i]);
+			_free_record(x);
+			if (eq) {
+				xerrno = ERR_UNIQ;
+				goto Error;
+			}
+		}
+	}
+
 	if ((buf = read_blk(a, h, NULL, &len)) == NULL)
-		return -1;
+		goto Error;
+	_free_record(old);
 
 	p = record2b_skip(buf, t, r);
 	ret = realloc_blk(a, h, buf, p - buf);
 	buf_put(a, buf);
 	return ret;
+ Error:
+	preserve_errno(_free_record(old));
+	return -1;
 }
 
 int delete_record(ALLOC * a, table_t * t, handle_t h)
@@ -273,6 +365,11 @@ int delete_record(ALLOC * a, table_t * t, handle_t h)
 
 	if ((r = read_record(a, t, h)) == NULL)
 		return -1;
+
+	for (int i = 0; i < t->ncols; i++)
+		if (t->cols[i].index != 0)
+			index_del(t->cols[i].idx, &r->vals[i]);
+
 	if (_list_del_record(a, t, r) < 0)
 		goto Error;
 	if (dealloc_blk(a, h) < 0)
