@@ -1,6 +1,5 @@
 //imxian(imkzy@foxmail.com)
-//This version only supports the unique value, and is very inefficient due to fixed key length. :(
-//just for reference and debug.
+//This version supports the non-unique key.
 #ifndef _BTREE_H
 #define _BTREE_H
 #include "alloc.h"
@@ -15,7 +14,7 @@ typedef struct btree_node btree_node;
 typedef struct BTree BTree;
 typedef struct BTreeEnum BTreeEnum;
 
-#define KEY_LENGTH 256
+#define KEY_LENGTH (256+8)
 struct btree_item {
     handle_t child;
     uint8_t key[KEY_LENGTH];
@@ -42,6 +41,7 @@ struct BTree{
     handle_t root; //pointer point to the root
     handle_t iroot; //real root address
     CMP collate; //compare function, use for comparing keys
+    uint8_t isUnique; //allow same keys or not
 };
 
 struct BTreeEnum {
@@ -50,21 +50,22 @@ struct BTreeEnum {
     int index; // which key in this node
     uint8_t key[KEY_LENGTH]; //key
     handle_t value; //value
+    uint8_t isUnique; //allow same keys or not
 };
 
 //to use the following function, you should malloc the space for struct BTree and BTreeEnum firstly!
 //Create a Btree
-extern handle_t CreateBTree(BTree *bt, ALLOC *store, CMP collate);
+extern handle_t CreateBTree(BTree *bt, ALLOC *store, uint8_t isUnique, CMP collate);
 //OpenBTree by the handle_t got from CreateBTree.
-extern void OpenBTree(BTree *bt, ALLOC *store, CMP collate, handle_t handle);
+extern void OpenBTree(BTree *bt, ALLOC *store, uint8_t isUnique, CMP collate, handle_t handle);
 //clear the whole Btree
 extern void ClearBTree(BTree *bt);
 //set the key/value
 extern void SetKey(BTree *bt, const void *key, handle_t value);
-//get the value by key
+//get the value by key, shouldn't be used in non-unique btree.
 extern handle_t GetKey(BTree *bt, const void *key);
-//delete the key/value
-extern void DeleteKey(BTree *bt, const void *key);
+//delete the key/value, (for unique Btree, value will be ignored)
+extern void DeleteKey(BTree *bt, const void *key, handle_t value);
 
 //all the function below may return an invalid enumerator,
 //you should check it using IsValid() or compare with EnumEnd() using IsEqual()!
@@ -81,7 +82,7 @@ extern void EnumEnd(BTreeEnum *bte, BTree *bt);
 extern int IsEqual(BTreeEnum *x, BTreeEnum *y);
 //take the next key/pointer
 extern void MoveNext(BTreeEnum *bte);
-//return the key, it is just bte->key
+//return the key, it isn't just bte->key due to non-unique key.
 extern const uint8_t *BTKey(BTreeEnum *bte);
 //return the value, it is just bte->value
 extern const handle_t BTValue(BTreeEnum *bte);

@@ -29,7 +29,7 @@ int main(void)
     assert(fsize(fd) == FLT_LEN);
 
     BTree bt;
-    handle_t root = CreateBTree(&bt, a, cmpInt);
+    handle_t root = CreateBTree(&bt, a, 1, cmpInt);
     int i;
     //int key = 10;
     //SetKey(&bt, &key, 10);
@@ -76,9 +76,9 @@ int main(void)
         output(&bt);
     }
     */
-    for(int i = 1; i <= 1000000; i++) SetKey(&bt, &i, i);
+    for(int i = 1; i <= 20; i++) SetKey(&bt, &i, i);
     //for(int i = 1; i<= 10; i++) out(&bt, i);
-    return 0;
+    //return 0;
     puts("123");
     output(&bt);
     //1 2 3...?
@@ -87,7 +87,7 @@ int main(void)
     scanf("%d", &n);
     for(int i = 0; i < n; i++) scanf("%d", &b[i]);
     //int b[] = {3, 7, 5}
-    for(i = 0; i < n; i++) DeleteKey(&bt, &b[i]);
+    for(i = 0; i < n; i++) DeleteKey(&bt, &b[i], 0);
     output(&bt);
     // 1 2 0 4 0...?
     ClearBTree(&bt);
@@ -97,7 +97,7 @@ int main(void)
     output(&bt);
     //1 2 3...?
     BTree *bt2 = malloc(sizeof(BTree));
-    OpenBTree(bt2, a, cmpInt, root);
+    OpenBTree(bt2, a, 1, cmpInt, root);
     output(bt2);
     //1 2 3...?
     BTreeEnum btn, invalid;
@@ -108,7 +108,7 @@ int main(void)
     }
     puts("");
     //1 2 3...?
-    for(i = 0; i < n; i++) DeleteKey(bt2, &b[i]);
+    for(i = 0; i < n; i++) DeleteKey(bt2, &b[i], 0);
     int t1 = 5, t2 = 9;
     EnumLower_bound(&btn, bt2, &t1);
     EnumUpper_bound(&invalid, bt2, &t2);
