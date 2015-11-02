@@ -23,8 +23,14 @@ typedef struct {
 
 extern DB *opendb(const char *path, int oflag, ...);
 extern void closedb(DB * db);
-extern int new_table(DB * db, const char *tname, const col_t * cols, int ncol);
-extern int delete_table(DB * db, table_t * t);
+
+extern int create_table(DB * db, const char *tname,
+			const col_t * cols, int ncol);
+extern int drop_table(DB * db, const char *tname);
+
+extern int create_index(DB * db, const char *tname, const char *colname,
+			const char *iname);
+extern int drop_index(DB * db, const char *iname);
 extern table_t *db_find_table(DB * db, const char *tname);
 
 #endif

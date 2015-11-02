@@ -38,9 +38,11 @@ extern int *_errno_value(void);
 #define ERR_DPTABLE 0x16	// A table with the same name exists
 #define ERR_NOCOL 0x17		// Column not in table
 #define ERR_INVOP 0x18		// Invalid selection operator
-#define ERR_DPIDX 0x19		// An index on this column exists
+#define ERR_DPIDX 0x19		// An index with the same name or on the same column exists
 #define ERR_UNIQ 0x1A		// Not meet the unique constraint
 #define ERR_TMNCOL 0x1B		// Too many columns
+#define ERR_NOTABLE 0x1C	// No such table
+#define ERR_NOIDX 0x1D		// No such index
 
 #define xperror(s) fprintf(stderr, "%s: %s\n", (s), __err_strings[xerrno])
 #define perror(s) do { if(errno) perror(s); if(xerrno) xperror(s); } while(0)

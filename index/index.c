@@ -94,6 +94,7 @@ int new_index(ALLOC * a, table_t * t, const char *colname)
 int delete_index(index_t * idx)
 {
 	ClearBTree(idx);
+	free(idx);
 	return 0;
 }
 

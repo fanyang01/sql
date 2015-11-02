@@ -14,6 +14,7 @@ static int _table_setnext(ALLOC * a, table_t * t, table_t * next);
 static int _list_add_table(DB * db, table_t * t);
 static int _list_remove_table(DB * db, table_t * t);
 static int _validate_cols(const col_t * cols, int ncol);
+static int _delete_table(DB * db, table_t * t);
 
 DB *opendb(const char *path, int oflag, ...)
 {
@@ -192,7 +193,7 @@ int _validate_cols(const col_t * cols, int ncol)
 	return 0;
 }
 
-int new_table(DB * db, const char *tname, const col_t * cols, int ncol)
+int create_table(DB * db, const char *tname, const col_t * cols, int ncol)
 {
 	table_t *t;
 
@@ -224,7 +225,18 @@ int new_table(DB * db, const char *tname, const col_t * cols, int ncol)
 	return -1;
 }
 
-int delete_table(DB * db, table_t * t)
+int drop_table(DB * db, const char *tname)
+{
+	table_t *t = db_find_table(db, tname);
+
+	if (t == NULL) {
+		xerrno = ERR_NOTABLE;
+		return -1;
+	}
+	return _delete_table(db, t);
+}
+
+int _delete_table(DB * db, table_t * t)
 {
 	if (clear_table(&db->a, t) < 0)
 		return -1;
@@ -249,4 +261,54 @@ table_t *db_find_table(DB * db, const char *tname)
 		if (strcmp(t->name, tname) == 0)
 			return t;
 	return NULL;
+}
+
+int create_index(DB * db, const char *tname, const char *colname,
+		 const char *iname)
+{
+	table_t *t;
+	int i;
+
+	if ((t = db_find_table(db, tname)) == NULL) {
+		xerrno = ERR_NOTABLE;
+		return -1;
+	}
+	if ((i = table_find_col(t, colname)) < 0) {
+		xerrno = ERR_NOCOL;
+		return -1;
+	}
+	for (t = db->thead; t != NULL; t = t->next_table)
+		for (int i = 0; i < t->ncols; i++)
+			if (strcmp(t->cols[i].iname, iname) == 0) {
+				xerrno = ERR_DPIDX;
+				return -1;
+			}
+
+	if (new_index(&db->a, t, colname) < 0)
+		return -1;
+	strlcpy(t->cols[i].iname, iname, NAMELEN + 1);
+	return write_table(&db->a, t->self, t);
+}
+
+int drop_index(DB * db, const char *iname)
+{
+	index_t *idx = NULL;
+	table_t *t;
+	int i;
+
+	for (t = db->thead; t != NULL; t = t->next_table)
+		for (i = 0; i < t->ncols; i++)
+			if (strcmp(t->cols[i].iname, iname) == 0) {
+				idx = t->cols[i].idx;
+				return -1;
+			}
+	if (idx == NULL) {
+		xerrno = ERR_NOIDX;
+		return -1;
+	}
+	if (delete_index(idx) < 0)
+		return -1;
+	bzero(t->cols[i].iname, NAMELEN + 1);
+	t->cols[i].index = 0;
+	return write_table(&db->a, t->self, t);
 }
