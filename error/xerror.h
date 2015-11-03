@@ -43,6 +43,7 @@ extern int *_errno_value(void);
 #define ERR_TMNCOL 0x1B		// Too many columns
 #define ERR_NOTABLE 0x1C	// No such table
 #define ERR_NOIDX 0x1D		// No such index
+#define ERR_TMNCOND 0x1E	// Too much query conditions
 
 #define xperror(s) fprintf(stderr, "%s: %s\n", (s), __err_strings[xerrno])
 #define perror(s) do { if(errno) perror(s); if(xerrno) xperror(s); } while(0)

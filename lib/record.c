@@ -19,11 +19,11 @@ int _equal(colv_t * x, colv_t * y)
 {
 	switch (x->type) {
 	case TYPE_INT:
-		return x->value.i == y->value.i;
+		return x->v.i == y->v.i;
 	case TYPE_FLOAT:
-		return x->value.f == y->value.f;
+		return x->v.f == y->v.f;
 	case TYPE_STRING:
-		return strcmp(x->value.s, y->value.s) == 0;
+		return strcmp(x->v.s, y->v.s) == 0;
 	}
 	abort();
 }
@@ -41,7 +41,7 @@ int _validate_record(ALLOC * a, table_t * t, record_t * r)
 		}
 	for (int i = 0; i < t->ncols; i++)
 		if (r->vals[i].type == TYPE_STRING)
-			if (strlen(r->vals[i].value.s) >= t->cols[i].size) {
+			if (strlen(r->vals[i].v.s) >= t->cols[i].size) {
 				xerrno = ERR_TOOLONG;
 				return -1;
 			}
@@ -99,13 +99,13 @@ void *record2b(void *buf, table_t * t, record_t * r)
 	for (int i = 0; i < r->len; i++) {
 		switch (r->vals[i].type) {
 		case TYPE_INT:
-			p = int32tob(p, r->vals[i].value.i);
+			p = int32tob(p, r->vals[i].v.i);
 			break;
 		case TYPE_FLOAT:
-			p = float2b(p, r->vals[i].value.f);
+			p = float2b(p, r->vals[i].v.f);
 			break;
 		case TYPE_STRING:
-			p = str2b(p, t->sizes[i], r->vals[i].value.s);
+			p = str2b(p, t->sizes[i], r->vals[i].v.s);
 			break;
 		}
 	}
@@ -121,13 +121,13 @@ void *record2b_skip(void *buf, table_t * t, record_t * r)
 	for (int i = 0; i < r->len; i++) {
 		switch (r->vals[i].type) {
 		case TYPE_INT:
-			p = int32tob(p, r->vals[i].value.i);
+			p = int32tob(p, r->vals[i].v.i);
 			break;
 		case TYPE_FLOAT:
-			p = float2b(p, r->vals[i].value.f);
+			p = float2b(p, r->vals[i].v.f);
 			break;
 		case TYPE_STRING:
-			p = str2b(p, t->sizes[i], r->vals[i].value.s);
+			p = str2b(p, t->sizes[i], r->vals[i].v.s);
 			break;
 		}
 	}
@@ -206,7 +206,6 @@ int _list_del_record(ALLOC * a, table_t * t, record_t * r)
 	return 0;
 }
 
-// TODO
 handle_t alloc_record(ALLOC * a, table_t * t, record_t * r)
 {
 	unsigned char *buf, *p;
@@ -241,8 +240,10 @@ record_t *_alloc_record(table_t * t)
 	char *p;
 
 	if ((r = calloc(1, sizeof(record_t) +
-			t->ncols * sizeof(colv_t))) == NULL)
+			t->ncols * sizeof(colv_t))) == NULL) {
+		xerrno = FATAL_NOMEM;
 		return NULL;
+	}
 
 	for (int i = 0; i < t->ncols; i++) {
 		r->vals[i].type = t->cols[i].type;
@@ -250,9 +251,10 @@ record_t *_alloc_record(table_t * t)
 		case TYPE_STRING:
 			if ((p = calloc(1, t->sizes[i])) == NULL) {
 				preserve_errno(_free_record(r));
+				xerrno = FATAL_NOMEM;
 				return NULL;
 			}
-			r->vals[i].value.s = p;
+			r->vals[i].v.s = p;
 		}
 	}
 	r->len = t->ncols;
@@ -278,15 +280,15 @@ record_t *read_record(ALLOC * a, table_t * t, handle_t h)
 	for (int i = 0; i < t->ncols; i++) {
 		switch (t->cols[i].type) {
 		case TYPE_INT:
-			r->vals[i].value.i = b2int32(p);
+			r->vals[i].v.i = b2int32(p);
 			p += 4;
 			break;
 		case TYPE_FLOAT:
-			r->vals[i].value.f = b2float(p);
+			r->vals[i].v.f = b2float(p);
 			p += 4;
 			break;
 		case TYPE_STRING:
-			strlcpy(r->vals[i].value.s, p, t->sizes[i]);
+			strlcpy(r->vals[i].v.s, p, t->sizes[i]);
 			break;
 		default:
 			xerrno = FATAL_INVDB;
@@ -304,7 +306,6 @@ record_t *read_record(ALLOC * a, table_t * t, handle_t h)
 	return NULL;
 }
 
-// TODO: validate the unique constraint
 int update_record(ALLOC * a, table_t * t, handle_t h, record_t * r)
 {
 	unsigned char *buf, *p;
@@ -403,7 +404,7 @@ void _free_record(record_t * r)
 {
 	for (int i = 0; i < r->len; i++)
 		if (r->vals[i].type == TYPE_STRING)
-			if (r->vals[i].value.s != NULL)
-				free(r->vals[i].value.s);
+			if (r->vals[i].v.s != NULL)
+				free(r->vals[i].v.s);
 	free(r);
 }

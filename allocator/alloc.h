@@ -4,7 +4,7 @@
 /*
  * handle:
  * - store as 7 bytes in NETWORK ORDER
- * - zero value means NULL
+ * - zero v means NULL
  * 
  *
  * FLT:
@@ -114,8 +114,8 @@ extern handle_t alloc_blk(ALLOC * a, void *buf, size_t len);
  * Read the entire block content referenced by handle.
  * If buf is not large enough to place the content, a new buffer is
  * allocated and be returned.
- * Callers should check whether buf == return value, and if not,
- * buf_put() MUST be called for the return value.
+ * Callers should check whether buf == return v, and if not,
+ * buf_put() MUST be called for the return v.
  * On return, *len is set to the length of block content in bytes.
  *
  * CRUD: read

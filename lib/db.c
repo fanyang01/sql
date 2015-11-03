@@ -13,8 +13,9 @@ static int _db_setroot(DB * db, table_t * t);
 static int _table_setnext(ALLOC * a, table_t * t, table_t * next);
 static int _list_add_table(DB * db, table_t * t);
 static int _list_remove_table(DB * db, table_t * t);
-static int _validate_cols(const col_t * cols, int ncol);
 static int _delete_table(DB * db, table_t * t);
+static int _validate_cols(const col_t * cols, int ncol);
+static void _sort_cols(table_t * t, char **colnames, colv_t * vals, int len);
 
 DB *opendb(const char *path, int oflag, ...)
 {
@@ -300,4 +301,76 @@ int drop_index(DB * db, const char *iname)
 				return delete_index(&db->a, t, i);
 	xerrno = ERR_NOIDX;
 	return -1;
+}
+
+int insert_into(DB * db, const char *tname,
+		char **colnames, colv_t * vals, int len)
+{
+	table_t *t;
+	record_t *r;
+
+	if ((t = db_find_table(db, tname)) == NULL) {
+		xerrno = ERR_NOTABLE;
+		return -1;
+	}
+	if (len != t->ncols) {
+		xerrno = ERR_NCOL;
+		return -1;
+	}
+	// validate column names and sort them
+	if (colnames != NULL) {
+		for (int i = 0; i < len; i++)
+			for (int j = i + 1; j < len; j++)
+				if (strncmp(colnames[i], colnames[j],
+					    NAMELEN + 1) == 0) {
+					xerrno = ERR_DPCNAME;
+					return -1;
+				}
+		for (int i = 0; i < len; i++)
+			if (table_find_col(t, colnames[i]) < 0) {
+				xerrno = ERR_NOCOL;
+				return -1;
+			}
+		_sort_cols(t, colnames, vals, len);
+	}
+
+	if ((r = _alloc_record(t)) == NULL)
+		return -1;
+	// deep copy
+	for (int i = 0; i < r->len; i++) {
+		switch (t->cols[i].type) {
+		case TYPE_INT:
+		case TYPE_FLOAT:
+			r->vals[i].v.i = vals[i].v.i;
+			break;
+		case TYPE_STRING:
+			strlcpy(r->vals[i].v.s, vals[i].v.s,
+				t->sizes[i]);
+			break;
+		}
+	}
+
+	handle_t h = alloc_record(&db->a, t, r);
+	preserve_errno(_free_record(r));
+	return h == 0 ? -1 : 0;
+}
+
+void _sort_cols(table_t * t, char **colnames, colv_t * vals, int len)
+{
+
+	for (int i = 0; i < len; i++) {
+		int pos;
+		for (pos = 0; pos < len; pos++)
+			if (strcmp(t->cols[i].name, colnames[pos]) == 0)
+				break;
+		if (pos != i) {
+			char *s = colnames[i];
+			colnames[i] = colnames[pos];
+			colnames[pos] = s;
+
+			colv_t tmp = vals[i];
+			vals[i] = vals[pos];
+			vals[pos] = tmp;
+		}
+	}
 }

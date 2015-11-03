@@ -49,7 +49,7 @@ struct BTreeEnum {
     handle_t id; //which node
     int index; // which key in this node
     uint8_t key[KEY_LENGTH]; //key
-    handle_t value; //value
+    handle_t v; //v
     uint8_t isUnique; //allow same keys or not
 };
 
@@ -60,12 +60,12 @@ extern handle_t CreateBTree(BTree *bt, ALLOC *store, uint8_t isUnique, CMP colla
 extern void OpenBTree(BTree *bt, ALLOC *store, uint8_t isUnique, CMP collate, handle_t handle);
 //clear the whole Btree
 extern void ClearBTree(BTree *bt);
-//set the key/value
-extern void SetKey(BTree *bt, const void *key, handle_t value);
-//get the value by key, shouldn't be used in non-unique btree.
+//set the key/v
+extern void SetKey(BTree *bt, const void *key, handle_t v);
+//get the v by key, shouldn't be used in non-unique btree.
 extern handle_t GetKey(BTree *bt, const void *key);
-//delete the key/value, (for unique Btree, value will be ignored)
-extern void DeleteKey(BTree *bt, const void *key, handle_t value);
+//delete the key/v, (for unique Btree, v will be ignored)
+extern void DeleteKey(BTree *bt, const void *key, handle_t v);
 
 //all the function below may return an invalid enumerator,
 //you should check it using IsValid() or compare with EnumEnd() using IsEqual()!
@@ -78,13 +78,13 @@ extern void EnumUpper_bound(BTreeEnum *bte, BTree *bt, const void *key); //>key
 extern void EnumBegin(BTreeEnum *bte, BTree *bt);
 //EnumEnd() just returns the invalid enumerator for IsEqual()
 extern void EnumEnd(BTreeEnum *bte, BTree *bt);
-//return value = 1, equals; value = 0, don't equals
+//return v = 1, equals; v = 0, don't equals
 extern int IsEqual(BTreeEnum *x, BTreeEnum *y);
 //take the next key/pointer
 extern void MoveNext(BTreeEnum *bte);
 //return the key, it isn't just bte->key due to non-unique key.
 extern const uint8_t *BTKey(BTreeEnum *bte);
-//return the value, it is just bte->value
+//return the v, it is just bte->v
 extern const handle_t BTValue(BTreeEnum *bte);
 
 #endif

@@ -10,7 +10,7 @@ typedef struct {
 		int i;
 		float f;
 		char *s;
-	} value;
+	} v;
 } colv_t;
 
 /*

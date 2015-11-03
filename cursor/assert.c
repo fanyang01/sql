@@ -11,14 +11,14 @@ int assert_cond(table_t * t, record_t * r, cond_t * cond)
 	int i = table_find_col(t, cond->attr);
 	switch (t->cols[i].type) {
 	case TYPE_INT:
-		return assert_int(r->vals[i].value.i, cond->op,
-				  cond->operand.value.i);
+		return assert_int(r->vals[i].v.i, cond->op,
+				  cond->operand.v.i);
 	case TYPE_FLOAT:
-		return assert_float(r->vals[i].value.f, cond->op,
-				    cond->operand.value.f);
+		return assert_float(r->vals[i].v.f, cond->op,
+				    cond->operand.v.f);
 	case TYPE_STRING:
-		return assert_string(r->vals[i].value.s, cond->op,
-				     cond->operand.value.s);
+		return assert_string(r->vals[i].v.s, cond->op,
+				     cond->operand.v.s);
 	}
 	// never get here
 	abort();

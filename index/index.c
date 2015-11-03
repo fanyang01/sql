@@ -6,7 +6,6 @@
 
 static CMP _collate_of(int type);
 static int _is_unique_col(int flag);
-static const void *_index_value_ptr(colv_t * val);
 
 CMP _collate_of(int type)
 {
@@ -38,11 +37,11 @@ const void *_index_value_ptr(colv_t * val)
 {
 	switch (val->type) {
 	case TYPE_INT:
-		return &(val->value.i);
+		return &(val->v.i);
 	case TYPE_FLOAT:
-		return &(val->value.f);
+		return &(val->v.f);
 	case TYPE_STRING:
-		return val->value.s;
+		return val->v.s;
 	}
 	abort();
 }

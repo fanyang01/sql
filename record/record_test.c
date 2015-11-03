@@ -35,9 +35,9 @@ int main(void)
 	assert(r->vals[1].type == TYPE_FLOAT);
 	assert(r->vals[2].type == TYPE_STRING);
 
-	r->vals[0].value.i = 123;
-	r->vals[1].value.f = 0.125;
-	strcpy(r->vals[2].value.s, "hello, world");
+	r->vals[0].v.i = 123;
+	r->vals[1].v.f = 0.125;
+	strcpy(r->vals[2].v.s, "hello, world");
 
 	assert(alloc_record(a, t, r) != 0 && r->self != 0);
 	assert(t->head == r->self && t->tail == r->self);
@@ -49,12 +49,12 @@ int main(void)
 	assert(r1->vals[1].type == TYPE_FLOAT);
 	assert(r1->vals[2].type == TYPE_STRING);
 
-	assert(r1->vals[0].value.i == 123);
-	assert(r1->vals[1].value.f == 0.125);
-	assert(strcmp(r->vals[2].value.s, "hello, world") == 0);
+	assert(r1->vals[0].v.i == 123);
+	assert(r1->vals[1].v.f == 0.125);
+	assert(strcmp(r->vals[2].v.s, "hello, world") == 0);
 
-	r1->vals[0].value.i = 124;
-	strcpy(r1->vals[2].value.s, "foobar");
+	r1->vals[0].v.i = 124;
+	strcpy(r1->vals[2].v.s, "foobar");
 
 	assert(alloc_record(a, t, r1) != 0 && r1->self != 0);
 
@@ -64,9 +64,9 @@ int main(void)
 	assert(r1 != NULL);
 	assert(r1->prev == r->self && r1->next == 0);
 	assert(t->head == r->self && t->tail == r1->self);
-	assert(r1->vals[0].value.i == 124);
-	assert(r1->vals[1].value.f == 0.125);
-	assert(strcmp(r1->vals[2].value.s, "foobar") == 0);
+	assert(r1->vals[0].v.i == 124);
+	assert(r1->vals[1].v.f == 0.125);
+	assert(strcmp(r1->vals[2].v.s, "foobar") == 0);
 
 	assert(delete_record(a, t, r1->self) == 0);
 	assert(read_record(a, t, r1->self) == NULL);
@@ -77,16 +77,16 @@ int main(void)
 	r = read_record(a, t, h);
 	assert(r != NULL);
 	assert(r->prev == 0 && r->next == 0);
-	assert(r->vals[0].value.i == 123);
+	assert(r->vals[0].v.i == 123);
 
-	r->vals[0].value.i = 125;
+	r->vals[0].v.i = 125;
 	assert(update_record(a, t, r->self, r) == 0);
 
 	h = r->self;
 	_free_record(r);
 	r = read_record(a, t, h);
 	assert(r != NULL);
-	assert(r->vals[0].value.i == 125);
+	assert(r->vals[0].v.i == 125);
 
 	assert(clear_table(a, t) == 0);
 	assert(t->head == 0 && t->tail == 0);
