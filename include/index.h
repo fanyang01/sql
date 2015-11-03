@@ -17,11 +17,4 @@ extern int index_exist(index_t * idx, colv_t * val);
 
 extern const void *_index_value_ptr(colv_t * val);
 
-#define index_foreach(IDX, H, NS) \
-	BTreeEnum NS##_iter, NS##_end; \
-	for(EnumBegin(&NS##_iter, (IDX)), EnumEnd(&NS##_end); \
-			(H = BTValue(&NS##_iter)) != 0 \
-			&& IsValid(&NS##_iter) && !IsEqual(&NS##_iter, &NS##_end); \
-			MoveNext(&NS##_iter))
-
 #endif

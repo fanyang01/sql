@@ -1,4 +1,14 @@
-all: testbuild
+CXX=g++
+CXXFLAGS = -I../include -L../lib -lsql -lpthread -lbsd -g
+SHELL=/bin/bash
+OUT=a.out
 
-testbuild: Interpreter.cpp Interpreter.h
-	g++ -c $< -o /dev/null
+all: testbuild $(OUT)
+
+testbuild: $(wildcard *.cpp)
+	$(foreach file, $(wildcard *.cpp), $(CXX) -c $(file) -o /dev/null $(CXXFLAGS);)
+
+SRC := $(wildcard *.cpp)
+
+$(OUT): $(SRC)
+	$(CXX) $^ -o $@ $(CXXFLAGS)

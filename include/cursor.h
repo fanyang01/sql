@@ -1,6 +1,7 @@
 #ifndef _STMT_H
 #define _STMT_H
 
+#include "alloc.h"
 #include "table.h"
 #include "record.h"
 
@@ -33,6 +34,7 @@ typedef struct {
 
 extern void _free_cursor(cursor_t * c);
 extern cursor_t *init_cursor(table_t * t, cond_t * conds, int ncond);
-extern int assert_cond(table_t * t, record_t * r, cond_t * cond);
+extern record_t *cursor_next(ALLOC * a, cursor_t * cur);
+extern int cursor_is_error(cursor_t * cur);
 
 #endif

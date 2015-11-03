@@ -21,9 +21,13 @@ char *__err_strings[] = {
 	[ERR_DPTABLE] = "A table with the same name exists",
 	[ERR_NOCOL] = "Column not in table",
 	[ERR_INVOP] = "Invalid selection operator",
-	[ERR_DPIDX] = "An index on this column exists",
+	[ERR_DPIDX] = "An index with the same name or on the same column exists",
 	[ERR_UNIQ] = "Not meet the unique constraint",
 	[ERR_TMNCOL] = "Too many columns",
+	[ERR_NOTABLE] = "No such table",
+	[ERR_NOIDX] = "No such index",
+	[ERR_TMNCOND] = "Too much query conditions",
+	[ERR_INVSTMT] = "Unsupported SQL statement",
 };
 
 static pthread_once_t _errno_once = PTHREAD_ONCE_INIT;

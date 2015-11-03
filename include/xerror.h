@@ -5,7 +5,9 @@
 #include <string.h>
 #include <errno.h>
 
+extern char *__err_strings[];
 extern int *_errno_value(void);
+
 #define xerrno (*_errno_value())
 
 #define preserve_errno(stmt) do { \
@@ -30,6 +32,8 @@ extern int *_errno_value(void);
 #define FATAL_NOMEM 0x7		// Out of memory
 #define FATAL_BLKNO 0x8		// Unexpected block number
 
+#define FATAL_MAX 0x10
+
 #define ERR_NCOL 0x11		// Unmatched number of columns
 #define ERR_COLTYPE 0x12	// Unmatched column type
 #define ERR_TOOLONG 0x13	// String too long
@@ -44,6 +48,7 @@ extern int *_errno_value(void);
 #define ERR_NOTABLE 0x1C	// No such table
 #define ERR_NOIDX 0x1D		// No such index
 #define ERR_TMNCOND 0x1E	// Too much query conditions
+#define ERR_INVSTMT 0x1F	// Unsupported SQL statement
 
 #define xperror(s) fprintf(stderr, "%s: %s\n", (s), __err_strings[xerrno])
 #define perror(s) do { if(errno) perror(s); if(xerrno) xperror(s); } while(0)

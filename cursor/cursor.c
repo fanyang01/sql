@@ -301,32 +301,42 @@ int _assert_string(const char *rv, int op, const char *cv)
 	abort();
 }
 
-record_t *cursor_next(DB * db, cursor_t * cur)
+record_t *cursor_next(ALLOC * a, cursor_t * cur)
 {
 	handle_t h = 0;
 	record_t *r;
 
-	if (cur->idx != NULL) {	// using index
-		if (IsEqual(cur->iter, cur->to)) {
-			cur->end = 1;
-			return NULL;
+	while (true) {
+		if (cur->idx != NULL) {	// using index
+			if (IsEqual(cur->iter, cur->to)) {
+				cur->end = 1;
+				return NULL;
+			}
+			h = BTValue(cur->iter);
+		} else {	// full scan
+			if (h == 0) {
+				cur->end = 1;
+				return NULL;
+			}
+			h = cur->hdl;
 		}
-		h = BTValue(cur->iter);
-	} else {		// full scan
-		if (h == 0) {
-			cur->end = 1;
-			return NULL;
-		}
-		h = cur->hdl;
-	}
 
-	if ((r = read_record(&db->a, cur->tbl, h)) == NULL) {
-		cur->error = 1;
-		return NULL;
+		if ((r = read_record(a, cur->tbl, h)) == NULL) {
+			cur->error = 1;
+			return NULL;
+		}
+		if (cursor_match(cur, cur->tbl, r))
+			return r;
+
+		if (cur->idx != NULL)
+			MoveNext(cur->iter);
+		else
+			cur->hdl = r->next;
+		_free_record(r);
 	}
-	if (cur->idx != NULL)
-		MoveNext(cur->iter);
-	else
-		cur->hdl = r->next;
-	return r;
+}
+
+int cursor_is_error(cursor_t * cur)
+{
+	return cur->error;
 }

@@ -1,4 +1,5 @@
 #include"API_Module.h"
+#include "db.h"
 #include <cstring>
 #include <cstdlib>
 //#include"Catalog_Manager.h"
@@ -157,7 +158,7 @@ stmt_t* select_without_struct(string sql, stmt_t *state)
 	return state;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//Validate the value for insert
+//Validate the v.for insert
 static bool isInt(string tmp)
 {
     char *end, c[100];
@@ -261,18 +262,18 @@ stmt_t* select_with_struct(string sql, stmt_t *state)
 		if(isInt(tmp))
 		{
 			state->conds[i].operand.type = TYPE_INT;
-			state->conds[i].operand.value.i = atoi(tmp.c_str());
+			state->conds[i].operand.v.i = atoi(tmp.c_str());
 		}
 		else if(isFloat(tmp))
 		{
 			state->conds[i].operand.type = TYPE_FLOAT;
-			state->conds[i].operand.value.f = atof(tmp.c_str());
+			state->conds[i].operand.v.f = atof(tmp.c_str());
 		}
 		else if(isString(tmp))
 		{
 			state->conds[i].operand.type = TYPE_STRING;
-			state->conds[i].operand.value.s = new char[STRING_MAX];
-			strcpy(state->conds[i].operand.value.s, tmp.substr(1, tmp.length()-2).c_str());
+			state->conds[i].operand.v.s = new char[STRING_MAX];
+			strcpy(state->conds[i].operand.v.s, tmp.substr(1, tmp.length()-2).c_str());
 		}
 	}
 	
@@ -344,18 +345,18 @@ stmt_t* delect_with_struct(string sql, stmt_t *state)
 		if(isInt(tmp))
 		{
 			state->conds[i].operand.type = TYPE_INT;
-			state->conds[i].operand.value.i = atoi(tmp.c_str());
+			state->conds[i].operand.v.i = atoi(tmp.c_str());
 		}
 		else if(isFloat(tmp))
 		{
 			state->conds[i].operand.type = TYPE_FLOAT;
-			state->conds[i].operand.value.f = atof(tmp.c_str());
+			state->conds[i].operand.v.f = atof(tmp.c_str());
 		}
 		else if(isString(tmp))
 		{
 			state->conds[i].operand.type = TYPE_STRING;
-			state->conds[i].operand.value.s = new char[STRING_MAX];
-			strcpy(state->conds[i].operand.value.s, tmp.substr(1, tmp.length()-2).c_str());
+			state->conds[i].operand.v.s = new char[STRING_MAX];
+			strcpy(state->conds[i].operand.v.s, tmp.substr(1, tmp.length()-2).c_str());
 		}
 	}
 	
@@ -398,18 +399,18 @@ stmt_t* insert_struct(string sql, stmt_t *state)
 		if(isInt(tmp))
 		{
 			state->vals[i].type = TYPE_INT;
-			state->vals[i].value.i = atoi(tmp.c_str());
+			state->vals[i].v.i = atoi(tmp.c_str());
 		}
 		else if(isFloat(tmp))
 		{
 			state->vals[i].type = TYPE_FLOAT;
-			state->vals[i].value.f = atof(tmp.c_str());
+			state->vals[i].v.f = atof(tmp.c_str());
 		}
 		else if(isString(tmp))
 		{
 			state->vals[i].type = TYPE_STRING;
-			state->vals[i].value.s = new char[STRING_MAX];
-			strcpy(state->vals[i].value.s, tmp.substr(1, tmp.length()-2).c_str());
+			state->vals[i].v.s = new char[STRING_MAX];
+			strcpy(state->vals[i].v.s, tmp.substr(1, tmp.length()-2).c_str());
 		}
 	}
 	
@@ -500,6 +501,8 @@ void API_Module(string sql)
 	{
 		quit();
 	}
+
+	exec_stmt(db, state);
 	
 	delete state;
 }
