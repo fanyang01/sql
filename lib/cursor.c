@@ -2,9 +2,15 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <bsd/string.h>
+#include <stdlib.h>
+#include <string.h>
 
 static int _validate_cond(table_t * t, cond_t * conds, int ncond);
 static cursor_t *_alloc_cursor(int ncond);
+static int _assert_cond(table_t * t, record_t * r, cond_t * cond);
+static int _assert_int(int rv, int op, int cv);
+static int _assert_float(float rv, int op, float cv);
+static int _assert_string(const char *rv, int op, const char *cv);
 
 int _validate_cond(table_t * t, cond_t * conds, int ncond)
 {
@@ -78,7 +84,7 @@ void _free_cursor(cursor_t * c)
 }
 
 // naive implementation
-cursor_t *plan_query(table_t * t, cond_t * conds, int ncond)
+cursor_t *init_cursor(table_t * t, cond_t * conds, int ncond)
 {
 	int mark[MAXNCOND];
 	cursor_t *cur;
@@ -170,25 +176,26 @@ cursor_t *plan_query(table_t * t, cond_t * conds, int ncond)
 	}
 	// deep copy
 	for (int i = 0, j = 0; i < ncond; i++) {
-		char *p;
-
 		if (i == best)
 			continue;
+		char *p;
+		int k = conds[i].icol;
+
+		strlcpy(cur->conds[j].attr, t->cols[k].name, NAMELEN + 1);
 		cur->conds[j].op = conds[i].op;
 		cur->conds[j].operand.type = conds[i].operand.type;
 
-		switch (t->cols[conds[i].icol].type) {
+		switch (t->cols[k].type) {
 		case TYPE_INT:
 		case TYPE_FLOAT:
 			cur->conds[j].operand.v.i = conds[i].operand.v.i;
 			break;
 		case TYPE_STRING:
-			if ((p = calloc(1, t->sizes[conds[i].icol])) == NULL) {
+			if ((p = calloc(1, t->sizes[k])) == NULL) {
 				xerrno = FATAL_NOMEM;
 				goto Error;
 			}
-			strlcpy(p, conds[i].operand.v.s,
-				t->sizes[conds[i].icol]);
+			strlcpy(p, conds[i].operand.v.s, t->sizes[k]);
 			break;
 		}
 		cur->conds[j++].icol = conds[i].icol;
@@ -199,4 +206,90 @@ cursor_t *plan_query(table_t * t, cond_t * conds, int ncond)
  Error:
 	_free_cursor(cur);
 	return NULL;
+}
+
+int cursor_match(cursor_t * cur, table_t * t, record_t * r)
+{
+	for (int i = 0; i < cur->ncond; i++)
+		if (!_assert_cond(t, r, &cur->conds[i]))
+			return 0;
+	return 1;
+}
+
+int _assert_cond(table_t * t, record_t * r, cond_t * cond)
+{
+	int i = cond->icol;
+	switch (t->cols[i].type) {
+	case TYPE_INT:
+		return _assert_int(r->vals[i].v.i, cond->op, cond->operand.v.i);
+	case TYPE_FLOAT:
+		return _assert_float(r->vals[i].v.f, cond->op,
+				     cond->operand.v.f);
+	case TYPE_STRING:
+		return _assert_string(r->vals[i].v.s, cond->op,
+				      cond->operand.v.s);
+	}
+	// never get here
+	abort();
+}
+
+int _assert_int(int rv, int op, int cv)
+{
+	switch (op) {
+	case OP_EQ:
+		return rv == cv;
+	case OP_NEQ:
+		return rv != cv;
+	case OP_GT:
+		return rv > cv;
+	case OP_GE:
+		return rv >= cv;
+	case OP_LT:
+		return rv < cv;
+	case OP_LE:
+		return rv <= cv;
+	}
+	// never get here
+	abort();
+}
+
+int _assert_float(float rv, int op, float cv)
+{
+	switch (op) {
+	case OP_EQ:
+		return rv == cv;
+	case OP_NEQ:
+		return rv != cv;
+	case OP_GT:
+		return rv > cv;
+	case OP_GE:
+		return rv >= cv;
+	case OP_LT:
+		return rv < cv;
+	case OP_LE:
+		return rv <= cv;
+	}
+	// never get here
+	abort();
+}
+
+int _assert_string(const char *rv, int op, const char *cv)
+{
+	int cmp = strcmp(rv, cv);
+	switch (op) {
+	case OP_EQ:
+		return cmp == 0;
+	case OP_NEQ:
+		return cmp != 0;
+	case OP_GT:
+		return cmp > 0;
+	case OP_GE:
+		return cmp >= 0;
+	case OP_LT:
+		return cmp < 0;
+	case OP_LE:
+		return cmp <= 0;
+	}
+	// never get here
+	abort();
 }

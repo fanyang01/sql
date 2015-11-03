@@ -31,7 +31,7 @@ typedef struct {
 } cursor_t;
 
 extern void _free_cursor(cursor_t * c);
-extern cursor_t *plan_query(table_t * t, cond_t * conds, int ncond);
+extern cursor_t *init_cursor(table_t * t, cond_t * conds, int ncond);
 extern int assert_cond(table_t * t, record_t * r, cond_t * cond);
 
 #endif
