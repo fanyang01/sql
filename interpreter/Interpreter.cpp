@@ -10,7 +10,7 @@
 #include"Interpreter.h"
 #include <cctype>
 #include<cstdlib>
-#include <cstring>
+#include<cstring>
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Read the user's input
 string read_input()
@@ -39,6 +39,17 @@ string read_input()
 
 	 return sql;
 }
+//////////////////////////////////////////////////////////////////////////////////////////////////
+//Validate a name of table, attribute or index
+bool isValidated(string name)
+{
+	for(int i = 0; i < name.length(); i++)
+	{
+		if(!isalnum(name[i])&& name[i] != '_')
+			return false;
+	}
+	return true;
+}
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 //Get the attributes.
 string get_attribute(string tmp, string sql)
@@ -50,11 +61,17 @@ string get_attribute(string tmp, string sql)
 	end = tmp.find(' ',start);
 	T = tmp.substr(start, end - start);
 	start = end + 1;
+	if(!isValidated(T))
+	{
+		cout << "Error : " << T << " is not a validated attribute name" << endl;
+		sql = "99";
+		return sql;
+	}
 	sql += T + " ";
 	//Get the attribute type
 	while(tmp[start] == ' ')
 		start++;
-	end = tmp.length() - 1;
+	end = tmp.find(' ', start);
 	T = tmp.substr(start, end-start);
 	start = end + 1;
 	length = T.length()-1;
@@ -94,7 +111,16 @@ string get_attribute(string tmp, string sql)
 				return sql;
 			}
 			else 
+			{
 				sql += C;
+//				 start = sql.find(')', index) ;
+//				if(start == -1)
+//				{
+//					cout << "syntex error : ) expected missing!" << endl;
+//					sql = "99";
+//					return sql;
+//				}
+			}
 		}
 		//If illegal
 		else 
@@ -125,6 +151,7 @@ string get_attribute(string tmp, string sql)
 		sql += " 0,";
 	return sql;
 }
+
 /////////////////////////////////////////////////////////////////////////////////////////////////
 //Validate the create_clause
 string create_clause(string sql, int start)
@@ -165,7 +192,7 @@ string create_clause(string sql, int start)
 //validate the create_table_clause
 string create_table(string sql, int start)
 {
-	string tmp, T, SQL;
+	string tmp, T, C, SQL;
 	int index, end, length;
 	//Get the table name
 	while(sql[start] == ' ')
@@ -196,7 +223,7 @@ string create_table(string sql, int start)
 		return sql;
 	}
 	//If the name if illegal
-	else if(tmp.find(' ') != -1)
+	else if(!isValidated(tmp))
 	{
 		cout<<"error: " << tmp << "---is not a valid table name!" << endl;
 		sql="99";
@@ -293,8 +320,34 @@ string create_table(string sql, int start)
 					//Storage the primary key
 					else 
 					{
-						SQL += T + " #;";
-						sql = "01" + SQL;
+						//check the primary key
+						// 1 for find the key attribute.
+						////01tablename,sno (8 0,sname (16 1,sage + 0,sgender (1 0,sno #;
+						int flag = 0; 
+						start = SQL.find(',') + 1;
+						while(SQL.find(',', start) != -1)
+						{
+							end = SQL.find(' ', start);
+							C = SQL.substr(start, end - start);
+							if(C == T)
+							{
+								flag = 1;
+								break;
+							}
+							start = SQL.find(',', start) + 1;
+						}
+						 
+						if(flag == 1)
+						{
+							SQL += T + " #;";
+							sql = "01" + SQL;
+						}
+						else
+						{
+							cout << "Error : invalidated primary key!" << endl;
+							sql = "99";
+							return sql;
+						}
 					}
 				}
 				//If illegal
@@ -308,14 +361,17 @@ string create_table(string sql, int start)
 			//if it is ordinary attribute
 			else
 			{
-				SQL = get_attribute(tmp, SQL);
-				if(SQL == "99")
-				{
-					sql ="99";
-					return sql;
-				}
-				else
-					sql = "01" + SQL;
+//				SQL = get_attribute(tmp, SQL);
+//				if(SQL == "99")
+//				{
+//					sql ="99";
+//					return sql;
+//				}
+//				else
+//					sql = "01" + SQL;
+				cout << "Error : primary key miss!" << endl;
+				sql = "99";
+				return sql;
 			}
 		}
 	}
@@ -351,7 +407,7 @@ string create_index_on(string sql, int start, string SQL)
 		//if validated
 		if(tmp.find(' ') == -1)
 		{
-			SQL += " " + tmp;
+			SQL += "," + tmp;
 			//Get the attribute name
 			while(sql[start] == ' ')
 				start ++;
@@ -374,9 +430,9 @@ string create_index_on(string sql, int start, string SQL)
 					length--;
 				tmp = tmp.substr(0, length + 1);
 				//if validated
-				if(tmp.find(' ') == -1)
+				if(isValidated(tmp))
 				{
-					SQL += " " + tmp;
+					SQL += "," + tmp;
 					while(sql[start] == ' ')
 						start++;
 					if(sql[start] != ';' || start != sql.length()-1)
@@ -386,7 +442,13 @@ string create_index_on(string sql, int start, string SQL)
 						return sql;
 					}
 					else 
-						sql = "02" + SQL;
+						sql = "02" + SQL + ";";
+				}
+				else
+				{
+					cout << "Error : " << tmp << " is not a validated attribute name" << endl;
+					sql = "99";
+					return sql;
 				}
 			}
 		}
@@ -505,7 +567,7 @@ string drop_index(string sql, int start)
 			return sql;
 		}
 		else
-			sql = "11" + tmp;
+			sql = "12" + tmp;
 	}
 	
 	return sql;
@@ -746,7 +808,7 @@ string select_clause(string sql,int start)
 				//no "where"
 				if(start == 0)
 				{
-					sql = "20" + SQL;
+					sql = "20" + SQL + ";";
 					return sql;
 				}
 				//"where" exist
@@ -791,6 +853,8 @@ static bool isFloat(string tmp)
     char *end, c[100];
     float n;
   
+  	if(tmp.find('.') == -1)
+  		return false;
 	strcpy(c, tmp.c_str());
 	n = strtod(c, &end);
 	//cout << strtol(c, &end, 10) << endl;
@@ -1080,7 +1144,7 @@ string delete_with_where(string sql, int start, string SQL)
 		return sql;
 	}
 	//if validated
-	sql = "21" + SQL;
+	sql = "41" + SQL;
 	
 	return sql;
 }
@@ -1155,13 +1219,13 @@ string delete_clause(string sql,int start)
 			//no "where"
 			if(start == 0)
 			{
-				sql = "20" + SQL;
+				sql = "40" + SQL;
 				return sql;
 			}
 			//"where" exist
 			else if(tmp == "where")
 			{
-				sql = select_with_where(sql, start, SQL);
+				sql = delete_with_where(sql, start, SQL);
 			}
 			//syntax error
 			else
@@ -1202,26 +1266,35 @@ string Interpreter(string statement)
 		sql = "99";
 	}
 	//create_database 00, create_table 01, create_index 02
+	//01tablename,sno (8 0,sname (16 1,sage + 0,sgender (1 0,sno #;
+	//02in1,table,attr;
 	else if(tmp == "create")
 		sql = create_clause(sql, start);
 	//drop_database 10, drop_table 11, drop index 12;
+	//11s1;
+	//12index1;
 	else if(tmp == "drop")
 		sql = drop_clause(sql, start);
 	//select without where 20, select_with_where 21;
+	//20table;
+	//21student,sage > 20,sgender = 'f';
 	else if(tmp == "select")
 		sql = select_clause(sql, start);
 	//insert 30
+	//30student,'12345678','wy',22,'m';
 	else if(tmp == "insert")
 		sql = insert_clause(sql, start);
 //	//delete without where 40, delete with where 41
+	//40student
+	//41student,sno = '88888888';
 	else if(tmp == "delete")
 		sql = delete_clause(sql, start);
 //	//use 50
 //	else if(tmp == "use")
 //		sql = use_clause(sql, start);
 	//quit 60
-//	else if(tmp == "quit")
-//		sql = quit_clause(sql, start);
+	else if(tmp == "quit")
+		sql = "60";
 	//execute_file 70
 //	else if(tmp == "execfile")
 //		sql = execfile_clause(sql, start);
