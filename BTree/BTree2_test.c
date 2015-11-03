@@ -27,12 +27,12 @@ int main(void)
     assert(fsize(fd) == FLT_LEN);
 
     BTree bt;
-    handle_t root = CreateBTree(&bt, a, 1, cmpStr);
+    handle_t root = CreateBTree(&bt, a, 1, 5, cmpStr);
     SetKey(&bt, "apple", 1);
     SetKey(&bt, "boy", 2);
     SetKey(&bt, "cat", 3);
     BTree *bt2 = malloc(sizeof(BTree));
-    OpenBTree(bt2, a, 1, cmpStr, root);
+    OpenBTree(bt2, a, 1,  5, cmpStr, root);
     output(bt2);
     DeleteKey(bt2, "boy", 0);
     output(bt2);

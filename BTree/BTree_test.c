@@ -29,7 +29,7 @@ int main(void)
     assert(fsize(fd) == FLT_LEN);
 
     BTree bt;
-    handle_t root = CreateBTree(&bt, a, 1, cmpInt);
+    handle_t root = CreateBTree(&bt, a, 1, 4, cmpInt);
     int i;
     //int key = 10;
     //SetKey(&bt, &key, 10);
@@ -97,7 +97,7 @@ int main(void)
     output(&bt);
     //1 2 3...?
     BTree *bt2 = malloc(sizeof(BTree));
-    OpenBTree(bt2, a, 1, cmpInt, root);
+    OpenBTree(bt2, a, 1, 4, cmpInt, root);
     output(bt2);
     //1 2 3...?
     BTreeEnum btn, invalid;

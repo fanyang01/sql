@@ -1,5 +1,5 @@
 //imxian(imkzy@foxmail.com)
-//This version supports the non-unique key.
+//This version supports non-unique and variable-length key.
 #include "BTree.h"
 #include <string.h>
 #include <time.h>
@@ -30,7 +30,7 @@ static int findKey(BTree *bt, btree_node *p, const void *key, int *index);
 static handle_t splitNode(BTree *bt, btree_node *p, void *key);
 //insert a key in a node
 static void insertKey(BTree *bt, handle_t ph, void *key, handle_t value);
-//merge a node withi its sibling, or replace them
+//merge a node with its sibling, or replace them
 static int isMerge(BTree *bt, btree_node *p, btree_node *child, int i, int isPred);
 //erase a key in a node
 static void eraseKey(BTree *bt, handle_t ph, const void *key);
@@ -46,22 +46,20 @@ static int cmpHandle(const void *a, const void *b);
 static int keyCmp(BTree *bt, const void *a, const void *b);
 //merge pointer and key as a new key if needed
 static void convertKey(BTree *bt, const void *key, handle_t value, uint8_t *Key);
+//get the key from the node by index
+static uint8_t *pKey(btree_node *p, int index);
+//get the child from the node by index
+static handle_t *pChild(btree_node *p, int index);
 
-/*
-void pout(btree_node * child){
-        for(int i = 0; i <= TABLE_SIZE+1;i++) {
-            printf("%ld %d ", child->items[i].child, *(int*)child->items[i].key);
-        }
-        puts("");
-}
-*/
-
-handle_t CreateBTree(BTree *bt, ALLOC *store, uint8_t isUnique, CMP collate) {
+handle_t CreateBTree(BTree *bt, ALLOC *store, uint8_t isUnique, uint16_t keyLength, CMP collate) {
     bt->store = store;
     bt->isUnique = isUnique;
     bt->collate = collate;
     bt->root = newBTree(store);
     bt->iroot = 0;
+    if (bt->isUnique) bt->keyLength = keyLength + 1;
+    else bt->keyLength = sizeof(handle_t) + keyLength + 1;
+    bt->M = (BLOCK_SIZE - 5) / (sizeof(handle_t) + bt->keyLength) - 2;
     return bt->root;
 }
 
@@ -72,12 +70,15 @@ handle_t newBTree(ALLOC *store) {
     return t;
 }
 
-void OpenBTree(BTree *bt, ALLOC *store, uint8_t isUnique, CMP collate, handle_t handle) {
+void OpenBTree(BTree *bt, ALLOC *store, uint8_t isUnique, uint16_t keyLength, CMP collate, handle_t handle) {
     bt->store = store;
     bt->isUnique = isUnique;
     bt->collate = collate;
     bt->root = handle;
     bt->iroot = getRoot(bt);
+    if (bt->isUnique) bt->keyLength = keyLength + 1;
+    else bt->keyLength = sizeof(handle_t) + keyLength + 1;
+    bt->M = (BLOCK_SIZE - 5) / (sizeof(handle_t) + bt->keyLength) - 2;
 }
 
 handle_t getRoot(BTree *bt) {
@@ -107,7 +108,7 @@ void clearNode(BTree *bt, handle_t ph) {
     btree_node *p = getNode(bt, ph);
     if (!p->isLeaf) {
         for (i = 0; i <= p->size; i++) {
-            clearNode(bt, p->items[i].child);
+            clearNode(bt, *pChild(p, i));
         }
     }
     putNode(bt, p);
@@ -172,23 +173,24 @@ void freeNode(BTree *bt, handle_t ph) {
 handle_t splitNode(BTree *bt, btree_node *p, void *key) {
     handle_t ph = allocNode(bt);
     btree_node *new_node = getNode(bt, ph);
+    new_node->keyLength = bt->keyLength;
     new_node->isLeaf = p->isLeaf;
     if (p->isLeaf) {
-        memcpy(key, p->items[(TABLE_SIZE+1)/2].key, KEY_LENGTH);
-        p->size = (TABLE_SIZE+1)/2;
-        new_node->size = TABLE_SIZE - p->size;
-        memcpy(new_node->items, &p->items[(TABLE_SIZE+1)/2], (new_node->size+1)*sizeof(btree_item));
-        new_node->items[TABLE_SIZE+1].child = p->items[TABLE_SIZE+1].child;
-        p->items[TABLE_SIZE+1].child = ph;
-        p->items[p->size].child = 0;
+        memcpy(key, pKey(p, (bt->M+1)/2), bt->keyLength);
+        p->size = (bt->M+1)/2;
+        new_node->size = bt->M - p->size;
+        memcpy(pChild(new_node, 0), pChild(p, (bt->M+1)/2), (new_node->size+1)*(sizeof(handle_t)+new_node->keyLength));
+        *pChild(new_node, bt->M+1) = *pChild(p, bt->M+1);
+        *pChild(p, bt->M+1) = ph;
+        *pChild(p, p->size) = 0;
         flushNode(bt, ph, new_node);
         return ph;
     }
     else {
-        memcpy(key, p->items[(TABLE_SIZE-1)/2].key, KEY_LENGTH);
-        p->size = (TABLE_SIZE-1)/2;
-        new_node->size = TABLE_SIZE - p->size - 1;
-        memcpy(new_node->items, &p->items[(TABLE_SIZE-1)/2+1], (new_node->size+1)*sizeof(btree_item));
+        memcpy(key, pKey(p, (bt->M-1)/2), bt->keyLength);
+        p->size = (bt->M-1)/2;
+        new_node->size = bt->M - p->size - 1;
+        memcpy(pChild(new_node, 0), pChild(p, (bt->M-1)/2+1), (new_node->size+1)*(sizeof(handle_t)+new_node->keyLength));
         flushNode(bt, ph, new_node);
         return ph;
     }
@@ -199,11 +201,11 @@ void insertKey(BTree *bt, handle_t ph, void *key, handle_t value) {
     int i;
     int ok = findKey(bt, p, key, &i);
     if (ok) i++;
-    handle_t left_child = p->items[i].child, right_child = 0;
+    handle_t left_child = *pChild(p, i), right_child = 0;
     if (!p->isLeaf) {
         insertKey(bt, left_child, key, value);
         btree_node *child = getNode(bt, left_child); 
-        if (child->size < TABLE_SIZE) {
+        if (child->size < bt->M) {
             putNode(bt, p);
             putNode(bt, child);
             return;
@@ -213,32 +215,32 @@ void insertKey(BTree *bt, handle_t ph, void *key, handle_t value) {
     } else {
         //printf("find %d %d\n", i, ok);
         if (ok) {
-            p->items[i-1].child = value;
+            *pChild(p, i-1) = value;
             flushNode(bt, ph, p);
             return;
         }
         left_child = value;
-        right_child = p->items[i].child;
+        right_child = *pChild(p, i);
     }
     p->size++;
-    memmove(&p->items[i + 1], &p->items[i], (p->size-i)*sizeof(btree_item));
-    memcpy(p->items[i].key, key, KEY_LENGTH);
-    p->items[i].child = left_child;
-    p->items[i + 1].child = right_child;
+    memmove(pChild(p, i + 1), pChild(p, i), (p->size-i)*(sizeof(handle_t)+p->keyLength));
+    memcpy(pKey(p, i), key, bt->keyLength);
+    *pChild(p, i) = left_child;
+    *pChild(p, i + 1) = right_child;
     flushNode(bt, ph, p);
 }
 
 void SetKey(BTree *bt, const void *key, handle_t value) {
     if (bt == NULL) return;
-    uint8_t Key[KEY_LENGTH];
+    uint8_t Key[bt->keyLength];
     convertKey(bt, key, value, Key);
-    //memcpy(Key, key, KEY_LENGTH);
+    //memcpy(Key, key, bt->keyLength);
     handle_t left_child, right_child;
     if (bt->iroot != 0) {
         insertKey(bt, bt->iroot, Key, value);
         btree_node *p = getNode(bt, bt->iroot);
         //pout(p);
-        if(p->size < TABLE_SIZE) {
+        if(p->size < bt->M) {
             putNode(bt, p);
             return;
         }
@@ -251,15 +253,16 @@ void SetKey(BTree *bt, const void *key, handle_t value) {
     }
     handle_t ph = allocNode(bt);
     btree_node *new_node = getNode(bt, ph);
+    new_node->keyLength = bt->keyLength;
     if(bt->iroot == 0) {
         new_node->isLeaf = 1;
-        new_node->items[TABLE_SIZE+1].child = 0;
+        *pChild(new_node, bt->M+1) = 0;
     }
     else new_node->isLeaf = 0;
     new_node->size = 1;
-    memcpy(new_node->items[0].key, Key, KEY_LENGTH);
-    new_node->items[0].child = left_child;
-    new_node->items[1].child = right_child;
+    memcpy(pKey(new_node, 0), Key, bt->keyLength);
+    *pChild(new_node, 0) = left_child;
+    *pChild(new_node, 1) = right_child;
     //pout(new_node);
     flushNode(bt, ph, new_node);
     flushRoot(bt, ph);
@@ -267,84 +270,84 @@ void SetKey(BTree *bt, const void *key, handle_t value) {
 
 
 void shiftRight(btree_node *p) {
-    memmove(&p->items[1], &p->items[0], (p->size+1)*sizeof(btree_item));
+    memmove(pChild(p, 1), pChild(p, 0), (p->size+1)*(sizeof(handle_t)+p->keyLength));
 }
 
 void shiftLeft(btree_node *p) {
-    memmove(&p->items[0], &p->items[1], p->size*sizeof(btree_item));
+    memmove(pChild(p, 0), pChild(p, 1), p->size*(sizeof(handle_t)+p->keyLength));
 }
 
 int isMerge(BTree *bt, btree_node *p, btree_node *child, int i, int isPred) {
     //printf("isMerge %d %d\n", i, isPred);
     btree_node *sibling;
-    if (isPred) sibling = getNode(bt, p->items[i+1].child);
-    else sibling = getNode(bt, p->items[i].child);
-    if ( (child->isLeaf && sibling->size+child->size < TABLE_SIZE) ||
-            (!child->isLeaf && sibling->size+child->size < TABLE_SIZE-1) ) {
+    if (isPred) sibling = getNode(bt, *pChild(p, i+1));
+    else sibling = getNode(bt, *pChild(p, i));
+    if ( (child->isLeaf && sibling->size+child->size < bt->M) ||
+            (!child->isLeaf && sibling->size+child->size < bt->M-1) ) {
         if (!isPred) {
             btree_node *tmp = child;
             child = sibling;
             sibling = tmp;
         }
         if (child->isLeaf) {
-            memcpy(&(child->items[child->size]), &(sibling->items[0]), (sibling->size+1)*sizeof(btree_item));
-            child->items[TABLE_SIZE+1].child = sibling->items[TABLE_SIZE+1].child;
+            memcpy(pChild(child, child->size), pChild(sibling, 0), (sibling->size+1)*(sizeof(handle_t)+sibling->keyLength));
+            *pChild(child, bt->M+1) = *pChild(sibling, bt->M+1);
             child->size += sibling->size;
         }
         else {
-            memcpy(child->items[child->size].key, p->items[i].key, KEY_LENGTH);
-            memcpy(&child->items[child->size+1], &sibling->items[0], (sibling->size+1)*sizeof(btree_item));
+            memcpy(pKey(child, child->size), pKey(p, i), bt->keyLength);
+            memcpy(pChild(child, child->size+1), pChild(sibling, 0), (sibling->size+1)*(sizeof(handle_t)+sibling->keyLength));
             child->size += sibling->size + 1;
         }
         //pout(child);
-        flushNode(bt, p->items[i].child, child);
+        flushNode(bt, *pChild(p, i), child);
         putNode(bt, sibling);
-        freeNode(bt, p->items[i+1].child);
+        freeNode(bt, *pChild(p, i+1));
         return 1;
     }
     if (!isPred) {
         shiftRight(child);
         if (!child->isLeaf) {
-            memcpy(child->items[0].key, p->items[i].key, KEY_LENGTH);
-            child->items[0].child = sibling->items[sibling->size].child;
-            memcpy(p->items[i].key, sibling->items[sibling->size-1].key, KEY_LENGTH);
+            memcpy(pKey(child, 0), pKey(p, i), bt->keyLength);
+            *pChild(child, 0) = *pChild(sibling, sibling->size);
+            memcpy(pKey(p, i), pKey(sibling, sibling->size-1), bt->keyLength);
         }
         else {
-            memcpy(child->items[0].key, sibling->items[sibling->size-1].key, KEY_LENGTH);
-            child->items[0].child = sibling->items[sibling->size-1].child;
-            sibling->items[sibling->size-1].child = 0;
-            memcpy(p->items[i].key, child->items[0].key, KEY_LENGTH);
+            memcpy(pKey(child, 0), pKey(sibling, sibling->size-1), bt->keyLength);
+            *pChild(child, 0) = *pChild(sibling, sibling->size-1);
+            *pChild(sibling, sibling->size-1) = 0;
+            memcpy(pKey(p, i), pKey(child, 0), bt->keyLength);
         }
         sibling->size--;
         child->size++;
-        flushNode(bt, p->items[i].child, sibling);
-        flushNode(bt, p->items[i+1].child, child);
+        flushNode(bt, *pChild(p, i), sibling);
+        flushNode(bt, *pChild(p, i+1), child);
     }
     else {
         if (!child->isLeaf) {
-            memcpy(child->items[child->size].key, p->items[i].key, KEY_LENGTH);
-            child->items[child->size+1].child = sibling->items[0].child;
-            memcpy(p->items[i].key, sibling->items[0].key, KEY_LENGTH);
+            memcpy(pKey(child, child->size), pKey(p, i), bt->keyLength);
+            *pChild(child, child->size+1) = *pChild(sibling, 0);
+            memcpy(pKey(p, i), pKey(sibling, 0), bt->keyLength);
         }
         else {
-            memcpy(child->items[child->size].key, sibling->items[0].key, KEY_LENGTH);
-            child->items[child->size].child = sibling->items[0].child;
-            memcpy(p->items[i].key, sibling->items[1].key, KEY_LENGTH);
+            memcpy(pKey(child, child->size), pKey(sibling, 0), bt->keyLength);
+            *pChild(child, child->size) = *pChild(sibling, 0);
+            memcpy(pKey(p, i), pKey(sibling, 1), bt->keyLength);
         }
         shiftLeft(sibling);
         sibling->size--;
         child->size++;
-        flushNode(bt, p->items[i].child, child);
-        flushNode(bt, p->items[i+1].child, sibling);
+        flushNode(bt, *pChild(p, i), child);
+        flushNode(bt, *pChild(p, i+1), sibling);
     }
     return 0;
 }
 
 void moveLeft(btree_node *p, int i) {
-    handle_t tmp = p->items[i].child;
-    memmove(&p->items[i], &p->items[i + 1], (p->size-i)*sizeof(btree_item));
+    handle_t tmp = *pChild(p, i);
+    memmove(pChild(p, i), pChild(p, i + 1), (p->size-i)*(sizeof(handle_t)+p->keyLength));
     p->size--;
-    p->items[i].child = tmp;
+    *pChild(p, i) = tmp;
 }
 
 void eraseKey(BTree *bt, handle_t ph, const void *key) {
@@ -354,13 +357,13 @@ void eraseKey(BTree *bt, handle_t ph, const void *key) {
     int i;
     int ok = findKey(bt, p, key, &i);
     if (ok) i++;
-    handle_t left_child = p->items[i].child;
+    handle_t left_child = *pChild(p, i);
     if (!p->isLeaf) {
         eraseKey(bt, left_child, key);
         btree_node *child = getNode(bt, left_child); 
         //pout(child);
-        if ( (child->isLeaf && child->size >= TABLE_SIZE/2) ||
-                (!child->isLeaf && child->size >= (TABLE_SIZE-1)/2) ) {
+        if ( (child->isLeaf && child->size >= bt->M/2) ||
+                (!child->isLeaf && child->size >= (bt->M-1)/2) ) {
             putNode(bt, p);
             putNode(bt, child);
             return;
@@ -388,7 +391,7 @@ void eraseKey(BTree *bt, handle_t ph, const void *key) {
         if(!ok) return;
         i--;
        // printf("%d\n", i);
-        p->items[i].child = p->items[i+1].child;
+        *pChild(p, i) = *pChild(p, i+1);
     }
     moveLeft(p, i);
     flushNode(bt, ph, p);
@@ -404,14 +407,14 @@ void eraseKey(BTree *bt, handle_t ph, const void *key) {
 void DeleteKey(BTree *bt, const void *key, handle_t value) {
     if (bt == NULL) return;
     if (bt->iroot == 0) return;
-    uint8_t Key[KEY_LENGTH];
+    uint8_t Key[bt->keyLength];
     convertKey(bt, key, value, Key);
     eraseKey(bt, bt->iroot, Key);
     btree_node *p = getNode(bt, bt->iroot);
     //pout(p);
     //printf("%d\n", p->size);
     if (p->size == 0) {
-        handle_t child = p->items[0].child;
+        handle_t child = *pChild(p, 0);
         freeNode(bt, bt->iroot);
         flushRoot(bt, child);
         //printf("%d\n", child);
@@ -428,13 +431,13 @@ handle_t GetKey(BTree *bt, const void *key) {
         btree_node *p = getNode(bt, ph);
         ok = findKey(bt, p, key, &index);
         if (p->isLeaf) {
-            if (ok) ph = p->items[index].child;
+            if (ok) ph = *pChild(p, index);
             else ph = 0;
             putNode(bt, p);
             break;
         }
         if (ok) index++;
-        ph = p->items[index].child;
+        ph = *pChild(p, index);
         putNode(bt, p);
     }
     return ph;
@@ -445,19 +448,19 @@ int findKey(BTree *bt, btree_node *p, const void *key, int *index) {
     int r = p->size;
     while (l + 1 < r) {
         int mid = (l + r) >> 1;
-        int ret = keyCmp(bt, p->items[mid].key, key);
+        int ret = keyCmp(bt, pKey(p, mid), key);
         if (ret < 0) l = mid;
         else r = mid;
     }
     *index = r;
-    return keyCmp(bt, p->items[*index].key, key) == 0;
+    return keyCmp(bt, pKey(p, *index), key) == 0;
 }
 
 void EnumLower_bound(BTreeEnum *bte, BTree *bt, const void *key) {
     EnumEnd(bte, bt);
     if(bt == NULL) return;
     if(bt->iroot == 0) return; 
-    uint8_t Key[KEY_LENGTH];
+    uint8_t Key[bt->keyLength];
     convertKey(bt, key, 0, Key);
     handle_t ph = bt->iroot;
     int isHit, index, flag = 0;
@@ -472,14 +475,14 @@ void EnumLower_bound(BTreeEnum *bte, BTree *bt, const void *key) {
             bte->store = bt->store;
             bte->id = ph;
             bte->index = index;
-            memcpy(bte->key, p->items[index].key, KEY_LENGTH);
-            bte->value = p->items[index].child;
+            memcpy(bte->key, pKey(p, index), bte->keyLength);
+            bte->value = *pChild(p, index);
             putNode(bt, p);
             if (flag) MoveNext(bte);
             break;
         }
         if (isHit) index++;
-        ph = p->items[index].child;
+        ph = *pChild(p, index);
         putNode(bt, p);
     }
 }
@@ -500,14 +503,14 @@ void EnumBegin(BTreeEnum *bte, BTree *bt) {
             bte->store = bt->store;
             bte->id = ph;
             bte->index = 0;
-            memcpy(bte->key, p->items[0].key, KEY_LENGTH);
+            memcpy(bte->key, pKey(p, 0), bte->keyLength);
             //printf("%d\n", sizeof(bte->key));
-            //printf("%d\n", sizeof(p->items[0].key));
-            bte->value = p->items[0].child;
+            //printf("%d\n", sizeof(pKey(p, 0)));
+            bte->value = *pChild(p, 0);
             putNode(bt, p);
             break;
         }
-        ph = p->items[0].child;
+        ph = *pChild(p, 0);
         putNode(bt, p);
     }
 }
@@ -517,6 +520,8 @@ void EnumEnd(BTreeEnum *bte, BTree *bt) {
     bte->id = 0;
     bte->index = 0;
     bte->isUnique = bt->isUnique;
+    bte->keyLength = bt->keyLength;
+    bte->M = bt->M;
 }
 
 void MoveNext(BTreeEnum *bte) {
@@ -526,12 +531,12 @@ void MoveNext(BTreeEnum *bte) {
     assert(p != NULL);
     if (bte->index < p->size - 1) {
         bte->index++;
-        memcpy(bte->key, p->items[bte->index].key, sizeof(bte->key));
-        bte->value = p->items[bte->index].child;
+        memcpy(bte->key, pKey(p, bte->index), sizeof(bte->key));
+        bte->value = *pChild(p, bte->index);
         buf_put(bte->store, p);
     }
     else {
-        bte->id = p->items[TABLE_SIZE+1].child;
+        bte->id = *pChild(p, bte->M+1);
         buf_put(bte->store, p);
         if (bte->id == 0) {
             bte->store = 0;
@@ -542,8 +547,8 @@ void MoveNext(BTreeEnum *bte) {
         p = read_blk(bte->store, bte->id, NULL, &len);
         assert(p != NULL);
         bte->index = 0;
-        memcpy(bte->key, p->items[bte->index].key, sizeof(bte->key));
-        bte->value = p->items[bte->index].child;
+        memcpy(bte->key, pKey(p, bte->index), sizeof(bte->key));
+        bte->value = *pChild(p, bte->index);
         buf_put(bte->store, p);
     }
 }
@@ -610,12 +615,20 @@ int keyCmp(BTree *bt, const void *a, const void *b) {
 
 void convertKey(BTree *bt, const void *key, handle_t value, uint8_t *Key) {
     if (bt->isUnique) {
-        memcpy(Key, key, KEY_LENGTH-sizeof(handle_t));
+        memcpy(Key, key, bt->keyLength);
     }
     else {
         memcpy(Key, &value, sizeof(handle_t));
-        memcpy(Key+sizeof(handle_t), key, KEY_LENGTH-sizeof(handle_t));
+        memcpy(Key+sizeof(handle_t), key, bt->keyLength-sizeof(handle_t));
     }
+}
+
+uint8_t *pKey(btree_node *p, int index) {
+    return (uint8_t *)p + (sizeof(handle_t)+p->keyLength)*index+sizeof(handle_t);
+}
+
+handle_t *pChild(btree_node *p, int index) {
+    return (handle_t*)((uint8_t *)p + (sizeof(handle_t)+p->keyLength)*index);
 }
 
 
