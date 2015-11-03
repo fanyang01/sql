@@ -201,7 +201,14 @@ cursor_t *init_cursor(table_t * t, cond_t * conds, int ncond)
 		cur->conds[j++].icol = conds[i].icol;
 	}
 
-	cur->ncond = (best >= 0 && (mark[best] & 0x10)) ? ncond - 1 : ncond;
+	cur->tbl = t;
+	if (best >= 0 && (mark[best] & 0x10)) {
+		cur->ncond = ncond - 1;
+		cur->hdl = 0;
+	} else {
+		cur->ncond = ncond;
+		cur->hdl = t->head;
+	}
 	return cur;
  Error:
 	_free_cursor(cur);
@@ -292,4 +299,34 @@ int _assert_string(const char *rv, int op, const char *cv)
 	}
 	// never get here
 	abort();
+}
+
+record_t *cursor_next(DB * db, cursor_t * cur)
+{
+	handle_t h = 0;
+	record_t *r;
+
+	if (cur->idx != NULL) {	// using index
+		if (IsEqual(cur->iter, cur->to)) {
+			cur->end = 1;
+			return NULL;
+		}
+		h = BTValue(cur->iter);
+	} else {		// full scan
+		if (h == 0) {
+			cur->end = 1;
+			return NULL;
+		}
+		h = cur->hdl;
+	}
+
+	if ((r = read_record(&db->a, cur->tbl, h)) == NULL) {
+		cur->error = 1;
+		return NULL;
+	}
+	if (cur->idx != NULL)
+		MoveNext(cur->iter);
+	else
+		cur->hdl = r->next;
+	return r;
 }

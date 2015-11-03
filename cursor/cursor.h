@@ -20,7 +20,8 @@ typedef struct {
 } cond_t;
 
 typedef struct {
-	handle_t h;
+	handle_t hdl;
+	table_t *tbl;
 	index_t *idx;
 	BTreeEnum *iter;
 	BTreeEnum *to;

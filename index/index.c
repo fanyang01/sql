@@ -55,6 +55,7 @@ int open_index(ALLOC * a, table_t * t, int i)
 		return -1;
 	}
 	OpenBTree(idx, a, _is_unique_col(t->cols[i].unique),
+		  t->cols[i].size,
 		  _collate_of(t->cols[i].type), t->cols[i].index);
 	t->cols[i].idx = idx;
 	return 0;
@@ -76,6 +77,7 @@ int new_index(ALLOC * a, table_t * t, int i)
 	}
 
 	if ((root = CreateBTree(idx, a, _is_unique_col(t->cols[i].unique),
+				t->cols[i].size,
 				_collate_of(t->cols[i].type))) == 0)
 		goto Error;
 
