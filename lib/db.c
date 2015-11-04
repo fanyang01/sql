@@ -178,6 +178,21 @@ int _validate_cols(const col_t * cols, int ncol)
 		return -1;
 	}
 	for (int i = 0; i < ncol; i++)
+		switch (cols[i].type) {
+		case TYPE_INT:
+		case TYPE_FLOAT:
+			break;
+		case TYPE_STRING:
+			if (cols[i].size == 0) {
+				xerrno = ERR_ZEROSLEN;
+				return -1;
+			}
+			break;
+		default:
+			xerrno = ERR_INVTYPE;
+			return -1;
+		}
+	for (int i = 0; i < ncol; i++)
 		for (int j = i + 1; j < ncol; j++)
 			if (strcmp(cols[i].name, cols[j].name) == 0) {
 				xerrno = ERR_DPCNAME;
@@ -270,10 +285,6 @@ int create_index(DB * db, const char *tname, const char *colname,
 	table_t *t;
 	int i;
 
-	if ((t = db_find_table(db, tname)) == NULL) {
-		xerrno = ERR_NOTABLE;
-		return -1;
-	}
 	for (t = db->thead; t != NULL; t = t->next_table)
 		for (int i = 0; i < t->ncols; i++)
 			if (strcmp(t->cols[i].iname, iname) == 0) {
@@ -281,6 +292,10 @@ int create_index(DB * db, const char *tname, const char *colname,
 				return -1;
 			}
 
+	if ((t = db_find_table(db, tname)) == NULL) {
+		xerrno = ERR_NOTABLE;
+		return -1;
+	}
 	if ((i = table_find_col(t, colname)) < 0) {
 		xerrno = ERR_NOCOL;
 		return -1;
@@ -333,6 +348,18 @@ int insert_into(DB * db, const char *tname,
 			}
 		_sort_cols(t, colnames, vals, len);
 	}
+	// validate values
+	for (int i = 0; i < len; i++) {
+		if (vals[i].type != t->cols[i].type) {
+			xerrno = ERR_COLTYPE;
+			return -1;
+		}
+		if (vals[i].type == TYPE_STRING)
+			if (strlen(vals[i].v.s) >= t->sizes[i]) {
+				xerrno = ERR_TOOLONG;
+				return -1;
+			}
+	}
 
 	if ((r = _alloc_record(t)) == NULL)
 		return -1;
@@ -344,8 +371,7 @@ int insert_into(DB * db, const char *tname,
 			r->vals[i].v.i = vals[i].v.i;
 			break;
 		case TYPE_STRING:
-			strlcpy(r->vals[i].v.s, vals[i].v.s,
-				t->sizes[i]);
+			strlcpy(r->vals[i].v.s, vals[i].v.s, t->sizes[i]);
 			break;
 		}
 	}

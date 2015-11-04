@@ -28,6 +28,7 @@ int main(void)
 	cols[1].unique = COL_PRIMARY;
 	strcpy(cols[2].name, "column2");
 	cols[2].type = TYPE_STRING;
+	cols[2].size = 13;
 	cols[2].unique = COL_UNIQUE;
 
 	assert(create_table(db, "table1", cols, ncol) != 0);
@@ -58,6 +59,40 @@ int main(void)
 	assert((t2 = db_find_table(db, "table2")) == NULL);
 	assert((t1 = db_find_table(db, "table1")) != NULL);
 	assert(strcmp(t1->name, "table1") == 0);
+
+	// primary key already has an index
+	assert(create_index(db, "table1", "column1", "column1_index") != 0);
+	assert(create_index(db, "table1", "column2", "column2_index") == 0);
+
+	char buf[20];
+	colv_t *vals = calloc(3, sizeof(colv_t));
+	assert(vals != NULL);
+	vals[0].type = TYPE_INT;
+	vals[0].v.i = 6060;
+	vals[1].type = TYPE_INT;
+	vals[1].v.f = 0.25;
+	vals[2].type = TYPE_STRING;
+	vals[2].v.s = buf;
+	strcpy(buf, "hello, world123");
+
+	assert(insert_into(db, "table1", NULL, vals, 4) != 0);
+	assert(insert_into(db, "table1", NULL, vals, 3) != 0);
+	vals[1].type = TYPE_FLOAT;
+	assert(insert_into(db, "table1", NULL, vals, 3) != 0);
+	strcpy(buf, "hello, world");
+	assert(insert_into(db, "table1", NULL, vals, 3) == 0);
+
+	// unique constraint
+	assert(insert_into(db, "table1", NULL, vals, 3) != 0);
+	vals[0].v.i = 6061;
+	assert(insert_into(db, "table1", NULL, vals, 3) != 0);
+	strcpy(buf, "foobar");
+	assert(insert_into(db, "table1", NULL, vals, 3) == 0);
+
+	assert(drop_index(db, "column2_index") == 0);
+	assert(create_index(db, "table1", "column2", "column2_index") == 0);
+	assert(create_index(db, "table1", "column3", "column2_index") != 0);
+	assert(create_index(db, "table1", "column3", "column3_index") == 0);
 
 	closedb(db);
 }

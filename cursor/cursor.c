@@ -176,7 +176,8 @@ cursor_t *init_cursor(table_t * t, cond_t * conds, int ncond)
 	}
 	// deep copy
 	for (int i = 0, j = 0; i < ncond; i++) {
-		if (i == best)
+		// if this condition is transfered to index, don't copy it
+		if (i == best && (mark[best] & 0x10))
 			continue;
 		char *p;
 		int k = conds[i].icol;
@@ -303,7 +304,7 @@ int _assert_string(const char *rv, int op, const char *cv)
 
 record_t *cursor_next(ALLOC * a, cursor_t * cur)
 {
-	handle_t h = 0;
+	handle_t h;
 	record_t *r;
 
 	while (true) {
@@ -314,7 +315,7 @@ record_t *cursor_next(ALLOC * a, cursor_t * cur)
 			}
 			h = BTValue(cur->iter);
 		} else {	// full scan
-			if (h == 0) {
+			if (cur->hdl == 0) {
 				cur->end = 1;
 				return NULL;
 			}
@@ -325,13 +326,14 @@ record_t *cursor_next(ALLOC * a, cursor_t * cur)
 			cur->error = 1;
 			return NULL;
 		}
-		if (cursor_match(cur, cur->tbl, r))
-			return r;
 
 		if (cur->idx != NULL)
 			MoveNext(cur->iter);
 		else
 			cur->hdl = r->next;
+
+		if (cursor_match(cur, cur->tbl, r))
+			return r;
 		_free_record(r);
 	}
 }

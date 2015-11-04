@@ -49,6 +49,8 @@ extern int *_errno_value(void);
 #define ERR_NOIDX 0x1D		// No such index
 #define ERR_TMNCOND 0x1E	// Too much query conditions
 #define ERR_INVSTMT 0x1F	// Unsupported SQL statement
+#define ERR_INVTYPE 0x20	// Unsupported column type
+#define ERR_ZEROSLEN 0x21	// Length of fix-length string can't be zero
 
 #define xperror(s) fprintf(stderr, "%s: %s\n", (s), __err_strings[xerrno])
 #define perror(s) do { if(errno) perror(s); if(xerrno) xperror(s); } while(0)

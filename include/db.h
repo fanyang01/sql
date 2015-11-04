@@ -27,19 +27,6 @@ extern "C" {
 #define MAXNCOND 32
 
 	typedef struct {
-		int type;	// statement type
-		char table[NAMELEN];	// table name
-		char index[NAMELEN];	// index name - create/drop index
-		char attr[NAMELEN];	// attribute name - create/drop index
-		int ncond;
-		cond_t *conds;	// array of conditions - select/delete
-		int ncol;
-		col_t *cols;	// array of columns - create table
-		int nval;
-		colv_t *vals;	// array of column values - insert
-	} stmt_t;
-
-	typedef struct {
 		ALLOC a;
 		char *name;
 		handle_t root;	// v at handle #1, point to first table metadata
@@ -91,6 +78,19 @@ extern "C" {
 	extern int select_error(cursor_t * cursor);
 	extern void free_record(record_t * r);
 	extern void free_cursor(cursor_t * cursor);
+
+	typedef struct {
+		int type;	// statement type
+		char table[NAMELEN];	// table name
+		char index[NAMELEN];	// index name - create/drop index
+		char attr[NAMELEN];	// attribute name - create/drop index
+		int ncond;
+		cond_t *conds;	// array of conditions - select/delete
+		int ncol;
+		col_t *cols;	// array of columns - create table
+		int nval;
+		colv_t *vals;	// array of column values - insert
+	} stmt_t;
 
 	extern void exec_stmt(DB * db, stmt_t * stmt);
 

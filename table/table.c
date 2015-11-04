@@ -208,13 +208,20 @@ handle_t alloc_table(ALLOC * a, table_t * t)
 	size_t len;
 	int i;
 
-	for (i = 0; i < t->ncols; i++)
+	for (i = 0; i < t->ncols; i++) {
+		switch (t->cols[i].type) {
+		case TYPE_INT:
+		case TYPE_FLOAT:
+			t->cols[i].size = 4;
+			break;
+		}
 		if (t->cols[i].unique == COL_PRIMARY) {
 			if (new_index(a, t, i) < 0)
 				return 0;
 			snprintf(t->cols[i].iname, NAMELEN + 1,
 				 "auto_index_%s_%s", t->name, t->cols[i].name);
 		}
+	}
 	// _table_cols_marshal realloc block pointed by hxroots, so alloc it here
 	// buf is much larger
 	p = buf;

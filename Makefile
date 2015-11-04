@@ -16,7 +16,9 @@ echo:
 	@echo SUMMARY:
 	@echo -e "\t" subdirectory: $(SUBDIRS)
 	@echo -e "\t" total $(shell find $(SUBDIRS) -name \*.[ch] | xargs cat | wc -l) \
-	   lines C code.	
+	   lines C code	
+	@echo -e "\t" total $(shell find $(SUBDIRS) -name \*.cpp | xargs cat | wc -l) \
+		lines C++ code
 	@echo
 
 .PHONY: subdirs $(SUBDIRS) copy testbuild lib
