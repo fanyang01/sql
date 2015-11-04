@@ -8,6 +8,7 @@ static int _exec_stmt(DB * db, stmt_t * stmt);
 static int select_and_print(DB * db, const char *tname, cond_t * conds,
 			    int ncond);
 static void print_line(table_t * t);
+static void print_head_line(table_t * t);
 static void print_thead(table_t * t);
 static void print_record(table_t * t, record_t * r);
 
@@ -60,7 +61,9 @@ int select_and_print(DB * db, const char *tname, cond_t * conds, int ncond)
 	table_t *t;
 	cursor_t *cur;
 	record_t *r;
+	int count;
 	int ret = 0;
+	int error, xerror;
 
 	if ((t = db_find_table(db, tname)) == NULL) {
 		xerrno = ERR_NOTABLE;
@@ -71,14 +74,46 @@ int select_and_print(DB * db, const char *tname, cond_t * conds, int ncond)
 
 	print_thead(t);
 
+	count = 0;
 	while ((r = select_next(db, cur)) != NULL) {
 		print_record(t, r);
 		free_record(r);
+		count++;
 	}
-	if (select_error(cur))
+	if (select_error(cur)) {
+		error = errno;
+		xerror = xerrno;
 		ret = -1;
+	}
+	printf("Total %d %s\n\n", count, count > 1 ? "records" : "record");
 	free_cursor(cur);
+
+	errno = error;
+	xerrno = xerror;
 	return ret;
+}
+
+void print_head_line(table_t * t)
+{
+	printf("+");
+	for (int i = 0; i < t->ncols; i++) {
+		switch (t->cols[i].type) {
+		case TYPE_INT:
+			for (int j = 0; j < INT_P_WIDTH; j++)
+				printf("=");
+			break;
+		case TYPE_FLOAT:
+			for (int j = 0; j < FLOAT_P_WIDTH; j++)
+				printf("=");
+			break;
+		case TYPE_STRING:
+			for (int j = 0; j < t->cols[i].size; j++)
+				printf("=");
+			break;
+		}
+		printf("=+");
+	}
+	printf("\n");
 }
 
 void print_line(table_t * t)
@@ -124,12 +159,11 @@ void print_thead(table_t * t)
 		printf(" |");
 	}
 	printf("\n");
+	print_head_line(t);
 }
 
 void print_record(table_t * t, record_t * r)
 {
-	print_line(t);
-
 	printf("|");
 	for (int i = 0; i < t->ncols; i++) {
 		switch (t->cols[i].type) {
@@ -146,4 +180,5 @@ void print_record(table_t * t, record_t * r)
 		printf(" |");
 	}
 	printf("\n");
+	print_line(t);
 }

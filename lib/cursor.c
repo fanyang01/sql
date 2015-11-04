@@ -197,6 +197,7 @@ cursor_t *init_cursor(table_t * t, cond_t * conds, int ncond)
 				goto Error;
 			}
 			strlcpy(p, conds[i].operand.v.s, t->sizes[k]);
+			cur->conds[j].operand.v.s = p;
 			break;
 		}
 		cur->conds[j++].icol = conds[i].icol;
