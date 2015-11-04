@@ -24,7 +24,7 @@ int main(void)
 	ALLOC allocator, *a = &allocator;
 	handle_t h;
 
-	init_allocator(a, fd, O_CREAT);
+	init_allocator(a, fd, O_CREAT | O_TRUNC);
 	h = alloc_table(a, t);
 	assert(h != 0);
 

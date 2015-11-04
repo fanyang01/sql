@@ -13,9 +13,7 @@ int main(void)
 	ALLOC allocator;
 	ALLOC *a = &allocator;
 
-	assert(init_allocator(a, fd, 0) != 0);
-
-	assert(init_allocator(a, fd, O_CREAT) == 0);
+	assert(init_allocator(a, fd, O_CREAT | O_TRUNC) == 0);
 	assert(fsize(fd) == FLT_LEN);
 
 	char buf[] = "hello, world";

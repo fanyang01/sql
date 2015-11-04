@@ -33,17 +33,21 @@ DB *opendb(const char *path, int oflag, ...)
 
 		va_start(ap, oflag);
 		mode = va_arg(ap, int);
+		va_end(ap);
+
 		fd = open(path, oflag, mode);
 	} else {
 		fd = open(path, oflag);
 	}
+
+	off_t flen = fsize(fd);
 
 	if (fd < 0 || init_allocator(&db->a, fd, oflag) < 0)
 		goto Error;
 
 	unsigned char buf[7];
 
-	if (oflag & O_CREAT) {
+	if ((oflag & O_TRUNC) || flen == 0) {
 		bzero(buf, 7);
 		if (alloc_blk(&db->a, buf, 7) != 1) {
 			xerrno = FATAL_BLKNO;

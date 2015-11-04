@@ -10,7 +10,7 @@ int main(void)
 	ALLOC allocator;
 	ALLOC *a = &allocator;
 
-	assert(init_allocator(a, fd, O_CREAT) == 0);
+	assert(init_allocator(a, fd, O_CREAT | O_TRUNC) == 0);
 
 	char buf[] = "hello, world";
 	handle_t h, h1, h2, h3;

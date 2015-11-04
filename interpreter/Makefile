@@ -1,5 +1,5 @@
 CXX=g++
-CXXFLAGS = -I../include -L../lib -lsql -lpthread -lbsd -g
+CXXFLAGS = -I../include -L../lib -lsql -lpthread -lbsd -lreadline -lhistory -g -std=c++11
 SHELL=/bin/bash
 OUT=a.out
 

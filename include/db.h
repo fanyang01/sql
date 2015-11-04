@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 
+#include "file.h"
 #include "xerror.h"
 #include "alloc.h"
 #include "type.h"

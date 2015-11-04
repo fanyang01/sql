@@ -54,7 +54,7 @@ int main(void)
 	handle_t h;
 	table_t *t3;
 
-	assert(init_allocator(a, fd, O_CREAT) == 0);
+	assert(init_allocator(a, fd, O_CREAT | O_TRUNC) == 0);
 	assert((h = alloc_table(a, t)) != 0);
 	assert((t3 = read_table(a, h)) != NULL);
 	assert(equal(t, t3));

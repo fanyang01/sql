@@ -24,7 +24,7 @@ int init_allocator(ALLOC * a, int fd, int oflag)
 		return -1;
 	}
 	bzero(a->flt, FLT_LEN);
-	if (oflag & O_CREAT) {
+	if ((oflag & O_TRUNC) || fsize(fd) == 0) {
 		if (ftruncate(fd, 0) == -1)
 			return -1;
 		if (alloc(fd, 0, FLT_LEN) == -1)
@@ -34,10 +34,6 @@ int init_allocator(ALLOC * a, int fd, int oflag)
 		return 0;
 	}
 	/* open an existing allocator */
-	if (fsize(fd) <= 0) {
-		xerrno = FATAL_INVDB;
-		return -1;
-	}
 	if (readat(fd, a->flt, FLT_LEN, 0) != FLT_LEN)
 		return -1;
 	return 0;
