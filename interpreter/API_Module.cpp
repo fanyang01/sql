@@ -1,5 +1,4 @@
 #include"API_Module.h"
-#include "db.h"
 #include <cstring>
 #include <cstdlib>
 //#include"Catalog_Manager.h"
@@ -144,21 +143,37 @@ stmt_t* drop_index_struct(string sql, stmt_t *state)
 //20table;
 stmt_t* select_without_struct(string sql, stmt_t *state)
 {
-	int end, count_attr, start = 2;
-	string table_name, tmp; 
+	int end, count_cond, start = 2, count_select = 0;
+	string table_name, tmp, attr; 
 	
 	state->type = STMT_SELECT;
 	//table name
-	end = sql.find(';', start);
+	end = sql.find(',', start);
 	table_name = sql.substr(start, end - start);
 	strcpy(state->table, table_name.c_str());
-	
-	state->conds = NULL;
+	/////////////////////////////////////////
+	state->cols = new col_t[MAXCOLS];
+	start = end + 2;
+//	end = sql.find(' ', start);
+//	attr = sql.substr(start, end);
+//	start = end + 1;
+	while(1)
+	{
+		end = sql.find(' ', start);
+		attr = sql.substr(start, end - start);
+		start = end + 1;
+		if(attr == ";") 
+			break;
+		strcpy(state->cols[count_select].name, attr.c_str());
+		count_select ++ ;
+	}
+	state->ncol = count_select;
+
 	
 	return state;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//Validate the v.for insert
+//Validate the value for insert
 static bool isInt(string tmp)
 {
     char *end, c[100];
@@ -212,25 +227,45 @@ int count_condition(string sql)
 			num++;
 	}
 	
-	return num;
+	return num - 1;
 }
-//21student,sage > 20,sgender = 'f';
+//21student, sage > 20,sgender = 'f';
+//21author, a_name id ; ,a_id > 35;
+//21author, ; ,a_name < 'naae';
 stmt_t* select_with_struct(string sql, stmt_t *state)
 {
-	int end, count_cond, start = 2;
-	string table_name, tmp; 
+	int end, count_cond, start = 2, count_select = 0;
+	string table_name, tmp, attr; 
 	
 	state->type = STMT_SELECT;
 	//table name
 	end = sql.find(',', start);
 	table_name = sql.substr(start, end - start);
 	strcpy(state->table, table_name.c_str());
-	//count
+	/////////////////////////////////////////
+	state->cols = new col_t[MAXCOLS];
+	start = end + 2;
+//	end = sql.find(' ', start);
+//	attr = sql.substr(start, end);
+//	start = end + 1;
+	while(1)
+	{
+		end = sql.find(' ', start);
+		attr = sql.substr(start, end - start);
+		start = end + 1;
+		if(attr == ";") 
+			break;
+		strcpy(state->cols[count_select].name, attr.c_str());
+		count_select ++ ;
+	}
+	state->ncol = count_select;
+	start ++;
+	/////////////////////////////
+	//count conditions
 	count_cond = count_condition(sql);
 	state->ncond = count_cond;
 	state->conds = new cond_t[count_cond];
 	//get the conditions
-	start = end + 1;
 	for(int i = 0; i < count_cond; i++)
 	{
 		//get attribute name
@@ -262,18 +297,18 @@ stmt_t* select_with_struct(string sql, stmt_t *state)
 		if(isInt(tmp))
 		{
 			state->conds[i].operand.type = TYPE_INT;
-			state->conds[i].operand.v.i = atoi(tmp.c_str());
+			state->conds[i].operand.value.i = atoi(tmp.c_str());
 		}
 		else if(isFloat(tmp))
 		{
 			state->conds[i].operand.type = TYPE_FLOAT;
-			state->conds[i].operand.v.f = atof(tmp.c_str());
+			state->conds[i].operand.value.f = atof(tmp.c_str());
 		}
 		else if(isString(tmp))
 		{
 			state->conds[i].operand.type = TYPE_STRING;
-			state->conds[i].operand.v.s = new char[STRING_MAX];
-			strcpy(state->conds[i].operand.v.s, tmp.substr(1, tmp.length()-2).c_str());
+			state->conds[i].operand.value.s = new char[STRING_MAX];
+			strcpy(state->conds[i].operand.value.s, tmp.substr(1, tmp.length()-2).c_str());
 		}
 	}
 	
@@ -345,18 +380,18 @@ stmt_t* delect_with_struct(string sql, stmt_t *state)
 		if(isInt(tmp))
 		{
 			state->conds[i].operand.type = TYPE_INT;
-			state->conds[i].operand.v.i = atoi(tmp.c_str());
+			state->conds[i].operand.value.i = atoi(tmp.c_str());
 		}
 		else if(isFloat(tmp))
 		{
 			state->conds[i].operand.type = TYPE_FLOAT;
-			state->conds[i].operand.v.f = atof(tmp.c_str());
+			state->conds[i].operand.value.f = atof(tmp.c_str());
 		}
 		else if(isString(tmp))
 		{
 			state->conds[i].operand.type = TYPE_STRING;
-			state->conds[i].operand.v.s = new char[STRING_MAX];
-			strcpy(state->conds[i].operand.v.s, tmp.substr(1, tmp.length()-2).c_str());
+			state->conds[i].operand.value.s = new char[STRING_MAX];
+			strcpy(state->conds[i].operand.value.s, tmp.substr(1, tmp.length()-2).c_str());
 		}
 	}
 	
@@ -399,18 +434,18 @@ stmt_t* insert_struct(string sql, stmt_t *state)
 		if(isInt(tmp))
 		{
 			state->vals[i].type = TYPE_INT;
-			state->vals[i].v.i = atoi(tmp.c_str());
+			state->vals[i].value.i = atoi(tmp.c_str());
 		}
 		else if(isFloat(tmp))
 		{
 			state->vals[i].type = TYPE_FLOAT;
-			state->vals[i].v.f = atof(tmp.c_str());
+			state->vals[i].value.f = atof(tmp.c_str());
 		}
 		else if(isString(tmp))
 		{
 			state->vals[i].type = TYPE_STRING;
-			state->vals[i].v.s = new char[STRING_MAX];
-			strcpy(state->vals[i].v.s, tmp.substr(1, tmp.length()-2).c_str());
+			state->vals[i].value.s = new char[STRING_MAX];
+			strcpy(state->vals[i].value.s, tmp.substr(1, tmp.length()-2).c_str());
 		}
 	}
 	
@@ -501,8 +536,6 @@ void API_Module(string sql)
 	{
 		quit();
 	}
-
-	exec_stmt(db, state);
 	
 	delete state;
 }
