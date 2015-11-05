@@ -182,3 +182,20 @@ void print_record(table_t * t, record_t * r)
 	printf("\n");
 	print_line(t);
 }
+
+void show_tables(DB * db)
+{
+	for (table_t * t = db->thead; t != NULL; t = t->next_table)
+		printf("%s\t", t->name);
+	printf("\n");
+}
+
+void show_indices(DB * db)
+{
+	for (table_t * t = db->thead; t != NULL; t = t->next_table)
+		for (int i = 0; i < t->ncols; i++)
+			if (t->cols[i].index != 0)
+				printf("%s: %s(%s)\t", t->cols[i].iname,
+				       t->name, t->cols[i].name);
+	printf("\n");
+}

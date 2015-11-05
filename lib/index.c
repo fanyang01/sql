@@ -93,6 +93,7 @@ int new_index(ALLOC * a, table_t * t, int i)
 
 	t->cols[i].index = root;
 	t->cols[i].idx = idx;
+	// caller must write table
 	return 0;
  Error:
 	preserve_errno(free(idx));

@@ -227,7 +227,12 @@ int create_table(DB * db, const char *tname, const col_t * cols, int ncol)
 		return -1;
 
 	strlcpy(t->name, tname, NAMELEN + 1);
-	memcpy(t->cols, cols, ncol * sizeof(col_t));
+	for (int i = 0; i < ncol; i++) {
+		t->cols[i].type = cols[i].type;
+		t->cols[i].unique = cols[i].unique;
+		t->cols[i].size = cols[i].size;
+		strlcpy(t->cols[i].name, cols[i].name, NAMELEN + 1);
+	}
 	t->next_table = db->thead;
 	if (db->thead != NULL)
 		t->next = db->thead->self;

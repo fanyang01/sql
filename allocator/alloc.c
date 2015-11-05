@@ -344,7 +344,7 @@ int list_setnext(ALLOC * a, handle_t x, handle_t next)
 handle_t flt_find(ALLOC * a, handle_t req, int *idx)
 {
 	handle_t h = 0;
-	for (int i = flt_idx(req); i < FLT_SIZE; i++)
+	for (int i = flt_idx(req) + 1; i < FLT_SIZE; i++)
 		if (a->flt[i] != 0) {
 			h = a->flt[i];
 			*idx = i;
