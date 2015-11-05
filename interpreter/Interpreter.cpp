@@ -36,7 +36,7 @@ string read_input()
 	 {
 	 	sql[i] = tolower(sql[i]);
 	 }
-
+	 cout << sql << endl;
 	 return sql;
 }
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -738,46 +738,111 @@ string select_with_where(string sql, int start, string SQL)
 	return sql;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//Validate the select_cluase
+//Validate the select_cluase   select id , name from t1 
 string select_clause(string sql,int start)
 {
-	string tmp, SQL;
-	int end, length;
-	//get the second word"*"
-	while(sql[start] == ' ')
-		start++;
-	end = sql.find(' ', start);
-	tmp = sql.substr(start, end-start);
-	start = end + 1;
-	if(tmp != "*")
+	string tmp, SQL, attr;
+	int end, length, count_attr = 0, index;
+//	//get the second word"*"
+//	while(sql[start] == ' ')
+//		start++;
+//	end = sql.find(' ', start);
+//	tmp = sql.substr(start, end-start);
+//	start = end + 1;
+	////////////////////////////////////////////////////////////
+	//get the attributes
+	if((index = sql.find("from", start)) == -1)
 	{
-		cout << "error :  attributes are not specified!" << endl;
-		sql = "99";
+		cout << "error : key word from missing!" << endl;
+		sql ="99";
 		return sql;
-	}
-	else
+	}  
+	while(1)
 	{
-		//get the third word "from"
 		while(sql[start] == ' ')
-		start++;
+			start++;
 		end = sql.find(' ', start);
 		tmp = sql.substr(start, end-start);
 		start = end + 1;
-		//if not exists
-		if(tmp.empty())
+		if(tmp == "*")
 		{
-			cout << "syntax error for 'from statement!" << endl;
+			count_attr = -1;
+			attr = " ; ";
+			while(sql[start] == ' ')
+			start++;
+			end = sql.find(' ', start);
+			tmp = sql.substr(start, end-start);
+			start = end + 1;
+			
+			if(tmp != "from")
+			{
+				cout << "error : key word from missing!" << endl;
+				sql ="99";
+				return sql;
+			}
+			break;
+		}
+		else if(tmp == ",")
+			continue;
+		if((tmp.empty() && count_attr == 0) || (tmp =="from" && count_attr == 0))
+		{
+			cout << "error :  attributes are not specified!" << endl;
 			sql = "99";
 			return sql;
 		}
 		else if(tmp != "from")
 		{
-			cout << "syntax error: " << tmp << " is not a valid key word!" << endl;
-			sql = "99";
-			return sql;
+			attr += " " + tmp;
+			count_attr ++ ;
 		}
-		else
+		else if(tmp == "from")
 		{
+			attr += " ; ";
+			break;
+		}
+		if(end >= index)
+		{
+			cout << "error :  attributes are not specified!" << endl;
+			sql ="99";
+			return sql;	
+		}
+	}
+	if(count_attr == 0)
+	{
+		cout << "error :  attributes are not specified!" << endl;
+		sql = "99";
+		return sql;
+	}
+	//////////////////////////////////////
+//	if(tmp != "*")
+//	{
+//		cout << "error :  attributes are not specified!" << endl;
+//		sql = "99";
+//		return sql;
+//	}
+//	else if(tmp == "*")
+//	{
+		//get the third word "from"
+//		while(sql[start] == ' ')
+//		start++;
+//		end = sql.find(' ', start);
+//		tmp = sql.substr(start, end-start);
+//		start = end + 1;
+//		//if not exists
+//		if(tmp.empty())
+//		{
+//			cout << "syntax error for 'from statement!" << endl;
+//			sql = "99";
+//			return sql;
+//		}
+//		else if(tmp != "from")
+//		{
+//			cout << "syntax error: " << tmp << " is not a valid key word!" << endl;
+//			sql = "99";
+//			return sql;
+//		}
+//		else
+//		{
 			//get the forth word table name
 			while(sql[start] == ' ')
 				start++;
@@ -799,7 +864,7 @@ string select_clause(string sql,int start)
 			else
 			{
 				//get the next word"where"
-				SQL = tmp ;
+				SQL = tmp + "," + attr;
 				while(sql[start] == ' ')
 					start++;
 				end = sql.find(' ', start);
@@ -824,8 +889,8 @@ string select_clause(string sql,int start)
 					return sql;
 				}
 			}
-		}
-	}
+//		}
+//	}
 	
 	return sql;
 	
@@ -875,6 +940,7 @@ static bool isString(string tmp)
 }
 /////////////////////////////////////////////////////////////////////////////////////////////////
 //validate the insert_into_values_clause
+//insert into t1 values(1.22,'hello,world', 12);
 string insert_into_values(string sql,int start,string SQL)
 {
 	string tmp;
@@ -943,7 +1009,99 @@ string insert_into_values(string sql,int start,string SQL)
 	sql = "30" + SQL;
 	
 	return sql;
-
+/////////////////////////
+//	string tmp;
+//	int  end, index, length;
+//	if( (end = sql.find('(', start) ) == -1)
+//	{
+//		cout << "error: '(' is missing" << endl;
+//		sql = "99";
+//		return sql;
+//	}
+//	start = end + 1;
+//	while(sql[start] == ' ')
+//		start++;
+//	while(sql[start] != ';')
+//	{
+//		if(sql[start] == ',')
+//			start ++ ;
+//		while(sql[start] == ' ')
+//			start++;
+//		if(sql[start] != '\'')
+//		{
+//			if((end = sql.find(',', start)) == -1)
+//				end = sql.find(')', start);
+//			while(sql[start] == ' ')
+//				start++;
+//			tmp = sql.substr(start, end-start);
+//			start = end + 1;
+//			length = tmp.length() - 1;
+//			while(tmp[length] == ' ')
+//				length--;
+//			tmp = tmp.substr(0, length + 1);
+//			//validate the value
+//			if(tmp.empty())
+//			{
+//				cout << "error : value can't be empty!" << endl;
+//				sql == "99";
+//				return sql;
+//			}
+//			else if(isInt(tmp) || isFloat(tmp))
+//			{
+//				SQL += tmp + ",";
+//			}
+//			else 
+//			{
+//				cout << "error : invalidated value!" << endl;
+//				sql == "99";
+//				return sql;
+//			}
+//		}
+//		else
+//		{
+//			if((end = sql.find('\'', start+1) )== -1)
+//			{
+//				cout << "error: \' is missing!" << endl;
+//				sql = "99";
+//				return sql;
+//			} 
+//			end ++;
+//			tmp = sql.substr(start, end - start );
+//			start = end + 1;
+//			//validate the value
+//			if(tmp.empty())
+//			{
+//				cout << "error : value can't be empty!" << endl;
+//				sql == "99";
+//				return sql;
+//			}
+//			else if(isString(tmp))
+//			{
+//				SQL += tmp + ",";
+//				while(sql[start] == ' ')
+//					start ++ ;
+//				if(sql[start] == ',')
+//				 	start ++ ;
+//				else
+//				{
+//					if(sql[start] == ')')
+//						start ++;
+//				}
+//			}
+//			else 
+//			{
+//				cout << "error : invalidated value!" << endl;
+//				sql == "99";
+//				return sql;
+//			}
+//			///////*******/////////////	 
+//		}
+//		while(sql[start] == ' ')
+//			start ++ ;
+//	}
+//	SQL[SQL.length()-1] = ';';
+//	sql = "30" + SQL;
+//	return sql;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //Validate the insert_clause
