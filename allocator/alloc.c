@@ -114,6 +114,17 @@ void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len)
 	unsigned char bytes[ATOM_LEN];
 	int newbuf = 0, redirect = 0;
 
+	void *new_buf;
+	if ((new_buf = cache_get(a, handle, &need)) != NULL) {
+		if (buf == NULL || need > *len) {
+			if ((buf = buf_get(a, need)) == NULL)
+				return NULL;
+	    		*len = need;
+		}
+		memcpy(buf, new_buf, need);
+		return buf;
+	}
+
  Retry:
 	offset = hdl2off(handle);
 	if (readat(a->fd, bytes, 8, offset) != 8)
@@ -148,6 +159,7 @@ void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len)
 			buf_put(a, buf);
 		return NULL;
 	}
+	cache_set(a, handle, buf, *len);
 	return buf;
 }
 
@@ -160,6 +172,8 @@ int dealloc_blk(ALLOC * a, handle_t handle)
 	handle_t redirect, atoms;
 	int redirected = 0;
 	unsigned char bytes[8];
+
+	cache_del(a, handle);
 
  Retry:
 	offset = hdl2off(handle);
@@ -201,6 +215,13 @@ int realloc_blk(ALLOC * a, handle_t handle, void *buf, size_t len)
 	handle_t prev_handle = 0, new_handle, old_atoms, new_atoms;
 	int redirected = 0;
 	unsigned char bytes[16];
+
+	void *new_buf;
+	size_t need;
+	if ((new_buf = cache_get(a, handle, &need)) != NULL) {
+		cache_set(a, handle, buf, len);
+		return 0;
+	}
 
  Retry:
 	offset = hdl2off(handle);
