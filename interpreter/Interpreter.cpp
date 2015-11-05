@@ -23,6 +23,8 @@ string read_input()
 	while(!finish)
 	{
 		cin >> tmp;
+		if(cin.eof())
+			exit(0);
 		sql += " " + tmp;
 		if(sql[sql.length()-1] == ';')
 		{

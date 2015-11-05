@@ -20,7 +20,7 @@ struct lru_node *_lru_find(ALLOC * a, handle_t h)
 	for (x = a->lru[idx]; x != NULL; x = x->hash_next)
 		if (x->self == h) {
 			return x;
-        }
+		}
 	return NULL;
 
 }
@@ -94,7 +94,6 @@ void _cache_shrink(ALLOC * a, size_t to)
 		_hash_del(a, x->self);
 		_list_remove(a, x);
 		a->lru_size -= x->size;
-		realloc_blk(a, x->self, x->block, x->size);
 		_freenode(a, x);
 	}
 }
@@ -108,7 +107,7 @@ int cache_set(ALLOC * a, handle_t h, void *buf, size_t len)
 	if ((new_buf = buf_get(a, len)) == NULL) {
 		return -1;
 	}
-	memcpy(new_buf, buf, len);	
+	memcpy(new_buf, buf, len);
 	if (x == NULL) {
 		if ((x = _newnode()) == NULL) {
 			xerrno = FATAL_NOMEM;

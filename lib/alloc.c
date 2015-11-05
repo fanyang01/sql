@@ -15,6 +15,10 @@ static handle_t flt_find(ALLOC * a, handle_t req, int *idx);
 static size_t len_need(size_t len);
 static handle_t len2atom(size_t len);
 static int flt_idx(handle_t size);
+// wrap them with cache operation
+static handle_t _alloc_blk(ALLOC * a, void *buf, size_t len);
+static int _realloc_blk(ALLOC * a, handle_t handle, void *buf, size_t len);
+void *_read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len);
 
 int init_allocator(ALLOC * a, int fd, int oflag)
 {
@@ -23,6 +27,8 @@ int init_allocator(ALLOC * a, int fd, int oflag)
 		xerrno = FATAL_NOMEM;
 		return -1;
 	}
+	a->lru_head = a->lru_tail = NULL;
+	a->lru_size = 0;
 	bzero(a->flt, FLT_LEN);
 	if ((oflag & O_TRUNC) || fsize(fd) == 0) {
 		if (ftruncate(fd, 0) == -1)
@@ -40,6 +46,14 @@ int init_allocator(ALLOC * a, int fd, int oflag)
 }
 
 handle_t alloc_blk(ALLOC * a, void *buf, size_t len)
+{
+	handle_t h = _alloc_blk(a, buf, len);
+	if (h != 0)
+		cache_set(a, h, buf, len);
+	return h;
+}
+
+handle_t _alloc_blk(ALLOC * a, void *buf, size_t len)
 {
 	handle_t req = len2atom(len), h;
 	int idx;
@@ -107,6 +121,28 @@ handle_t alloc_blk(ALLOC * a, void *buf, size_t len)
 
 void *read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len)
 {
+	void *cbuf, *ret;
+	size_t need;
+
+	if ((cbuf = cache_get(a, handle, &need)) != NULL) {
+		if (buf == NULL || need > *len) {
+			if ((buf = buf_get(a, need)) == NULL)
+				return NULL;
+			*len = need;
+		}
+		memcpy(buf, cbuf, need);
+		return buf;
+	}
+
+	ret = _read_blk(a, handle, buf, len);
+	if (ret != NULL)
+		cache_set(a, handle, ret, *len);
+
+	return ret;
+}
+
+void *_read_blk(ALLOC * a, handle_t handle, void *buf, size_t * len)
+{
 	if (handle == 0)
 		return NULL;
 	off_t offset;
@@ -161,6 +197,8 @@ int dealloc_blk(ALLOC * a, handle_t handle)
 	int redirected = 0;
 	unsigned char bytes[8];
 
+	cache_del(a, handle);
+
  Retry:
 	offset = hdl2off(handle);
 	if (readat(a->fd, bytes, 8, offset) != 8)
@@ -195,6 +233,14 @@ int dealloc_blk(ALLOC * a, handle_t handle)
 }
 
 int realloc_blk(ALLOC * a, handle_t handle, void *buf, size_t len)
+{
+	int ret = _realloc_blk(a, handle, buf, len);
+	if (ret == 0)
+		cache_set(a, handle, buf, len);
+	return ret;
+}
+
+int _realloc_blk(ALLOC * a, handle_t handle, void *buf, size_t len)
 {
 	off_t offset;
 	size_t olen;
