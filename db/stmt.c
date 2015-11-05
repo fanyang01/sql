@@ -7,18 +7,16 @@
 static int _exec_stmt(DB * db, stmt_t * stmt);
 static int select_and_print(DB * db, const char *tname,
 			    col_t * cols, int ncol, cond_t * conds, int ncond);
-static void print_head_line(col_t * cols, int ncol);
-static void print_line(col_t * cols, int ncol);
-static void print_thead(col_t * cols, int ncol);
-static void print_record(table_t * t, col_t * cols, int ncol, record_t * r);
+static int _max(int a, int b);
+static void print_head_line(col_t * cols, int ncol, int width[]);
+static void print_line(col_t * cols, int ncol, int width[]);
+static void print_thead(col_t * cols, int ncol, int width[]);
+static void print_record(table_t * t, col_t * cols, int ncol, record_t * r,
+			 int width[]);
 
 void exec_stmt(DB * db, stmt_t * stmt)
 {
 	if (_exec_stmt(db, stmt) < 0) {
-		if (errno != 0) {
-			perror("FATAL SYSTEM ERROR");
-			exit(1);
-		}
 		if (xerrno != 0) {
 			if (xerrno < FATAL_MAX) {	// fatal error
 				perror("FATAL ERROR");
@@ -26,6 +24,10 @@ void exec_stmt(DB * db, stmt_t * stmt)
 			}
 			perror("ERROR");
 			return;
+		}
+		if (errno != 0) {
+			perror("FATAL SYSTEM ERROR");
+			exit(1);
 		}
 		fprintf(stderr, "Undetected Error\n");
 		exit(3);
@@ -73,7 +75,6 @@ static int select_and_print(DB * db, const char *tname,
 	for (int i = 0; i < ncol; i++) {
 		int k;
 		if ((k = table_find_col(t, cols[i].name)) < 0) {
-			printf("%s not found\n", cols[i].name);
 			xerrno = ERR_NOCOL;
 			return -1;
 		}
@@ -86,14 +87,41 @@ static int select_and_print(DB * db, const char *tname,
 		cols = t->cols;
 	}
 
-	if ((cur = select_from(db, tname, conds, ncond)) == NULL)
-		return -1;
+	int *width;
 
-	print_thead(cols, ncol);
+	if ((width = calloc(ncol, sizeof(int))) == NULL) {
+		perror("out of memory");
+		return -1;
+	}
+
+	for (int i = 0; i < ncol; i++) {
+		int k = table_find_col(t, cols[i].name);
+		switch (t->cols[k].type) {
+		case TYPE_INT:
+			width[i] =
+			    _max(INT_P_WIDTH, strlen(t->cols[k].name) + 1);
+			break;
+		case TYPE_FLOAT:
+			width[i] =
+			    _max(FLOAT_P_WIDTH, strlen(t->cols[k].name) + 1);
+			break;
+		case TYPE_STRING:
+			width[i] =
+			    _max(t->cols[k].size, strlen(t->cols[k].name) + 1);
+			break;
+		}
+	}
+
+	if ((cur = select_from(db, tname, conds, ncond)) == NULL) {
+		preserve_errno(free(width));
+		return -1;
+	}
+
+	print_thead(cols, ncol, width);
 
 	count = 0;
 	while ((r = select_next(db, cur)) != NULL) {
-		print_record(t, cols, ncol, r);
+		print_record(t, cols, ncol, r, width);
 		free_record(r);
 		count++;
 	}
@@ -104,26 +132,32 @@ static int select_and_print(DB * db, const char *tname,
 	}
 	printf("Total %d %s\n\n", count, count > 1 ? "records" : "record");
 	free_cursor(cur);
+	free(width);
 	errno = error;
 	xerrno = xerror;
 	return ret;
 }
 
-void print_head_line(col_t * cols, int ncol)
+int _max(int a, int b)
+{
+	return a > b ? a : b;
+}
+
+void print_head_line(col_t * cols, int ncol, int width[])
 {
 	printf("+");
 	for (int i = 0; i < ncol; i++) {
 		switch (cols[i].type) {
 		case TYPE_INT:
-			for (int j = 0; j < INT_P_WIDTH; j++)
+			for (int j = 0; j < width[i]; j++)
 				printf("=");
 			break;
 		case TYPE_FLOAT:
-			for (int j = 0; j < FLOAT_P_WIDTH; j++)
+			for (int j = 0; j < width[i]; j++)
 				printf("=");
 			break;
 		case TYPE_STRING:
-			for (int j = 0; j < cols[i].size; j++)
+			for (int j = 0; j < width[i]; j++)
 				printf("=");
 			break;
 		}
@@ -132,21 +166,21 @@ void print_head_line(col_t * cols, int ncol)
 	printf("\n");
 }
 
-void print_line(col_t * cols, int ncol)
+void print_line(col_t * cols, int ncol, int width[])
 {
 	printf("+");
 	for (int i = 0; i < ncol; i++) {
 		switch (cols[i].type) {
 		case TYPE_INT:
-			for (int j = 0; j < INT_P_WIDTH; j++)
+			for (int j = 0; j < width[i]; j++)
 				printf("-");
 			break;
 		case TYPE_FLOAT:
-			for (int j = 0; j < FLOAT_P_WIDTH; j++)
+			for (int j = 0; j < width[i]; j++)
 				printf("-");
 			break;
 		case TYPE_STRING:
-			for (int j = 0; j < cols[i].size; j++)
+			for (int j = 0; j < width[i]; j++)
 				printf("-");
 			break;
 		}
@@ -155,29 +189,30 @@ void print_line(col_t * cols, int ncol)
 	printf("\n");
 }
 
-void print_thead(col_t * cols, int ncol)
+void print_thead(col_t * cols, int ncol, int width[])
 {
-	print_line(cols, ncol);
+	print_head_line(cols, ncol, width);
 	printf("|");
 	for (int i = 0; i < ncol; i++) {
 		switch (cols[i].type) {
 		case TYPE_INT:
-			printf("%*s", INT_P_WIDTH, cols[i].name);
+			printf("%*s", width[i], cols[i].name);
 			break;
 		case TYPE_FLOAT:
-			printf("%*s", FLOAT_P_WIDTH, cols[i].name);
+			printf("%*s", width[i], cols[i].name);
 			break;
 		case TYPE_STRING:
-			printf("%*s", cols[i].size, cols[i].name);
+			printf("%*s", width[i], cols[i].name);
 			break;
 		}
 		printf(" |");
 	}
 	printf("\n");
-	print_head_line(cols, ncol);
+	print_head_line(cols, ncol, width);
 }
 
-void print_record(table_t * t, col_t * cols, int ncol, record_t * r)
+void print_record(table_t * t, col_t * cols, int ncol, record_t * r,
+		  int width[])
 {
 	if (ncol == 0) {
 		cols = t->cols;
@@ -186,22 +221,21 @@ void print_record(table_t * t, col_t * cols, int ncol, record_t * r)
 	printf("|");
 	for (int i = 0; i < ncol; i++) {
 		int k = table_find_col(t, cols[i].name);
-
 		switch (cols[i].type) {
 		case TYPE_INT:
-			printf("%*d", INT_P_WIDTH, r->vals[k].v.i);
+			printf("%*d", width[i], r->vals[k].v.i);
 			break;
 		case TYPE_FLOAT:
-			printf("%*.*f", FLOAT_P_WIDTH - 2, 2, r->vals[k].v.f);
+			printf("%*.*f", width[i], 2, r->vals[k].v.f);
 			break;
 		case TYPE_STRING:
-			printf("%*s", t->cols[i].size, r->vals[k].v.s);
+			printf("%*s", width[i], r->vals[k].v.s);
 			break;
 		}
 		printf(" |");
 	}
 	printf("\n");
-	print_line(cols, ncol);
+	print_line(cols, ncol, width);
 }
 
 void show_tables(DB * db)
