@@ -757,6 +757,11 @@ string select_clause(string sql,int start)
 		sql ="99";
 		return sql;
 	}  
+	for(int i = start; i < index; i++)
+	{
+		if(sql[i] == ',')
+			sql[i] = ' ';
+	}
 	while(1)
 	{
 		while(sql[start] == ' ')
@@ -1396,7 +1401,24 @@ string delete_clause(string sql,int start)
 	}
 //}
 	
-	return sql;
+	return sql;	
+}
+//execfile 
+string execfile_clause(string sql,int start)
+{
+	string filename;
+	int end, length;
+	while(sql[start] == ' ')
+		start ++;
+	end = sql.length()-2;
+	filename = sql.substr(start, end - start + 1);
+	length = filename.length() - 1;
+	while(filename[length] == ' ')
+		length--;
+	filename = filename.substr(0, length + 1);
+	
+	sql = "70 " + filename;
+	return sql; 
 	
 }
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1454,8 +1476,8 @@ string Interpreter(string statement)
 	else if(tmp == "quit")
 		sql = "60";
 	//execute_file 70
-//	else if(tmp == "execfile")
-//		sql = execfile_clause(sql, start);
+	else if(tmp == "execfile")
+		sql = execfile_clause(sql, start);
 	//help 80
 	else if(tmp == "help")
 		sql = "80";
