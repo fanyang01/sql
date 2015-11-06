@@ -349,7 +349,7 @@ stmt_t* delect_with_struct(string sql, stmt_t *state)
 	table_name = sql.substr(start, end - start);
 	strcpy(state->table, table_name.c_str());
 	//count
-	count_cond = count_condition(sql);
+	count_cond = count_condition(sql) + 1;
 	state->ncond = count_cond;
 	state->conds = new cond_t[count_cond];
 	//get the conditions
