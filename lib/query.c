@@ -34,26 +34,25 @@ void free_record(record_t * r)
 int delete_from(DB * db, const char *tname, cond_t * conds, int ncond)
 {
 	table_t *t;
-	cursor_t *cur;
 	record_t *r;
-	int ret = -1;
+	handle_t h, hprev;
+	int match;
 
 	if ((t = db_find_table(db, tname)) == NULL) {
 		xerrno = ERR_NOTABLE;
 		return -1;
 	}
-	if ((cur = init_cursor(t, conds, ncond)) == NULL)
-		return -1;
 
-	while ((r = cursor_next(&db->a, cur)) != NULL) {
-		if (delete_record(&db->a, t, r->self) < 0)
-			goto Error;
+	for (h = t->tail; h != 0; h = hprev) {
+		if ((r = read_record(&db->a, t, h)) == NULL)
+			return -1;
+		hprev = r->prev;
+		match = conds_match(t, r, conds, ncond);
 		_free_record(r);
+		if (!match)
+			continue;
+		if (delete_record(&db->a, t, h) < 0)
+			return -1;
 	}
-	if (cursor_is_error(cur))
-		goto Error;
-	ret = 0;
- Error:
-	_free_cursor(cur);
-	return ret;
+	return 0;
 }

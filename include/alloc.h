@@ -68,8 +68,8 @@
 #define ATOM_LEN 16
 #define FLT_LEN (FLT_SIZE * sizeof(handle_t))
 
-#define LRU_NSLOT 5003		// a prime
-#define LRU_SIZE (50<<20)
+#define LRU_NSLOT 2017		// a prime
+#define LRU_SIZE (1<<22)
 
 #define CTBLK_MAXSHORT 254
 #define CTBLK_MAXLONG 65533
@@ -134,8 +134,8 @@ extern int dealloc_blk(ALLOC * a, handle_t handle);
 
 extern void *buf_get(ALLOC * a, size_t len);
 extern void buf_put(ALLOC * a, void *p);
-extern int cache_set(ALLOC *a, handle_t h, void *buf, size_t len);
-extern void *cache_get(ALLOC *a, handle_t h, size_t *len);
-extern void cache_del(ALLOC *a, handle_t h);
+extern int cache_set(ALLOC * a, handle_t h, void *buf, size_t len);
+extern void *cache_get(ALLOC * a, handle_t h, size_t * len);
+extern void cache_del(ALLOC * a, handle_t h);
 
 #endif

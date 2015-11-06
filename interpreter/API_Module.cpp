@@ -10,6 +10,7 @@ const string help_message = R"(
 \dt: display all tables
 \di: display all indices
 \i: read and execute a sql file
+\t: show definition of tables
 )";
 
 //////////////////////////////////////////////////////////////////
@@ -535,6 +536,7 @@ void API_Module(string sql)
 	else if(type == "80")
 	{
 		help();
+		return;
 	}
 	//quit
 	else if(type == "60")

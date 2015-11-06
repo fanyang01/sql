@@ -7,6 +7,7 @@
 
 static int _validate_cond(table_t * t, cond_t * conds, int ncond);
 static cursor_t *_alloc_cursor(int ncond);
+static int cursor_match(cursor_t * cur, table_t * t, record_t * r);
 static int _assert_cond(table_t * t, record_t * r, cond_t * cond);
 static int _assert_int(int rv, int op, int cv);
 static int _assert_float(float rv, int op, float cv);
@@ -215,6 +216,14 @@ cursor_t *init_cursor(table_t * t, cond_t * conds, int ncond)
  Error:
 	_free_cursor(cur);
 	return NULL;
+}
+
+int conds_match(table_t * t, record_t * r, cond_t * conds, int ncond)
+{
+	for (int i = 0; i < ncond; i++)
+		if (!_assert_cond(t, r, &conds[i]))
+			return 0;
+	return 1;
 }
 
 int cursor_match(cursor_t * cur, table_t * t, record_t * r)

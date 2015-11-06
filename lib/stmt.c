@@ -254,3 +254,37 @@ void show_indices(DB * db)
 				       t->name, t->cols[i].name);
 	printf("\n");
 }
+
+void show_table_info(DB * db)
+{
+	printf("\n");
+	for (table_t * t = db->thead; t != NULL; t = t->next_table) {
+		printf("TABLE %s (\n", t->name);
+		for (int i = 0; i < t->ncols; i++) {
+			printf("\t%s\t", t->cols[i].name);
+			switch (t->cols[i].type) {
+			case TYPE_INT:
+				printf("int");
+				break;
+			case TYPE_FLOAT:
+				printf("float");
+				break;
+			case TYPE_STRING:
+				printf("char(%d)", t->cols[i].size);
+				break;
+			}
+			switch (t->cols[i].unique) {
+			case COL_PRIMARY:
+				printf(", PRIMARY KEY (%s)", t->cols[i].name);
+				break;
+			case COL_UNIQUE:
+				printf(" UNIQUE");
+				break;
+			}
+			if (i != t->ncols - 1)
+				printf(",");
+			printf("\n");
+		}
+		printf(")\n\n");
+	}
+}

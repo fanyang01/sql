@@ -6,6 +6,8 @@
 #include <cstring>
 #include <iostream>
 #include <string>
+#include <sstream>
+#include <vector>
 #include <algorithm>
 #include <functional>
 #include <cctype>
@@ -120,7 +122,6 @@ string _readline()
 	s = trim(s);
 
 	if (s[0] == '\\') {
-		/* s.erase(s.length() - 1, 1); */
 		docmd(s);
 		return _readline();
 	}
@@ -166,8 +167,11 @@ void docmd(string line)
 			break;
 		}
 		break;
+	case 't':
+		show_table_info(db);
+		break;
 	case 'i':
-		exec_sqlfile(line.erase(0, 1));
+		exec_sqlfile(trim(line.erase(0, 1)));
 		break;
 	default:
 		cerr << "Unsupported command: " << "\\" << line << endl;
@@ -184,7 +188,7 @@ string & ltrim(string & s)
 {
 	s.erase(s.begin(),
 		find_if(s.begin(), s.end(),
-			not1(ptr_fun < int, int >(isspace))));
+			not1(ptr_fun<int, int>(isspace))));
 	return s;
 }
 
@@ -192,7 +196,7 @@ string & ltrim(string & s)
 string & rtrim(string & s)
 {
 	s.erase(find_if(s.rbegin(), s.rend(),
-			not1(ptr_fun < int, int >(isspace))).base(), s.end());
+			not1(ptr_fun<int, int>(isspace))).base(), s.end());
 	return s;
 }
 

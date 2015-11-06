@@ -214,13 +214,8 @@ int dealloc_blk(ALLOC * a, handle_t handle)
 		if (redirected)	// allow only once redirect
 			return -1;
 		redirect = b2hdl(&bytes[1]);
-		if (hdl2off(handle + 1) >= fsize(a->fd)) {
-			if (ftruncate(a->fd, offset) == -1)
-				return -1;
-		} else {
-			if (free_blk(a, handle, 1) != 0)
-				return -1;
-		}
+		if (free_blk(a, handle, 1) != 0)
+			return -1;
 		handle = redirect;
 		redirected = 1;
 		goto Retry;
@@ -322,6 +317,7 @@ int free_blk(ALLOC * a, handle_t h, handle_t atoms)
 	}
 	if (writeat(a->fd, buf, sizeof(buf), hdl2off(h)) != sizeof(buf))
 		return -1;
+
 	idx = flt_idx(atoms);
 	next = a->flt[idx];
 	a->flt[idx] = h;
@@ -394,6 +390,7 @@ handle_t flt_find(ALLOC * a, handle_t req, int *idx)
 		if (a->flt[i] != 0) {
 			h = a->flt[i];
 			*idx = i;
+			break;
 		}
 	return h;
 }

@@ -37,4 +37,5 @@ extern cursor_t *init_cursor(table_t * t, cond_t * conds, int ncond);
 extern record_t *cursor_next(ALLOC * a, cursor_t * cur);
 extern int cursor_is_error(cursor_t * cur);
 
+extern int conds_match(table_t * t, record_t * r, cond_t * conds, int ncond);
 #endif

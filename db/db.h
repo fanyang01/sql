@@ -95,6 +95,7 @@ extern "C" {
 
 	extern void exec_stmt(DB * db, stmt_t * stmt);
 	extern void show_tables(DB * db);
+	extern void show_table_info(DB * db);
 	extern void show_indices(DB * db);
 
 #ifdef __cplusplus
