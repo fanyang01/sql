@@ -6,7 +6,7 @@ build:
             name: Install libbsd-dev
             code: |
                 apt-get update
-                apt-get install -y libbsd-dev
+                apt-get install -y libbsd-dev libedit-dev
         - script:
             name: Build & Test
             code: |
