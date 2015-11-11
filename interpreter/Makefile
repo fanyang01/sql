@@ -1,7 +1,7 @@
 CXX=g++
-CXXFLAGS = -I../include -L../lib -lsql -lpthread -lbsd -ledit -g -std=c++11
+CXXFLAGS = -I../include -L../lib -lsql -lpthread -lbsd -ledit -std=c++11
 SHELL=/bin/bash
-OUT=a.out
+OUT=oursql
 
 all: clean testbuild $(OUT)
 

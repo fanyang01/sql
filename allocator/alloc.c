@@ -31,7 +31,7 @@ int init_allocator(ALLOC * a, int fd, int oflag)
 	a->lru_size = 0;
 	bzero(a->flt, FLT_LEN);
 	if ((oflag & O_TRUNC) || fsize(fd) == 0) {
-		if (ftruncate(fd, 0) == -1)
+		if (fshrink(fd, 0) == -1)
 			return -1;
 		if (alloc(fd, 0, FLT_LEN) == -1)
 			return -1;
@@ -298,7 +298,7 @@ int _realloc_blk(ALLOC * a, handle_t handle, void *buf, size_t len)
 int free_blk(ALLOC * a, handle_t h, handle_t atoms)
 {
 	if (hdl2off(h + atoms) >= fsize(a->fd))
-		return ftruncate(a->fd, hdl2off(h));
+		return fshrink(a->fd, hdl2off(h));
 
 	unsigned char buf[16];
 	handle_t prev = 0, next;

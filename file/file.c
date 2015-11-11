@@ -26,12 +26,6 @@ ssize_t writeat(int fd, void *buf, size_t count, off_t offset)
 
 int alloc(int fd, off_t offset, off_t len)
 {
-	// TODO: result in slower insertion
-	//
-	// pre-allocate one more page
-	/* if (fallocate(fd, FALLOC_FL_KEEP_SIZE, offset, */
-	/*            ((((offset + len) >> 12) + 2) << 12) - offset) != 0) */
-	/*      return -1; */
 	/* return posix_fallocate(fd, offset, len); */
 	/* return fallocate(fd, 0, offset, len); */
 	if (fsize(fd) < offset + len)
@@ -51,4 +45,9 @@ off_t fsize(int fd)
 	if (fstat(fd, &st) == -1)
 		return -1;
 	return st.st_size;
+}
+
+int fshrink(int fd, off_t len)
+{
+	return ftruncate(fd, len);
 }

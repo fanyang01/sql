@@ -1,5 +1,5 @@
 LIB=libsql.a
-CFLAGS = -I ../include -Wall -lpthread -lbsd -g
+CFLAGS = -I ../include -Wall -lpthread -lbsd
 SRC_FILES := $(wildcard *.c)
 OBJ_FILES := $(patsubst %.c, %.o, $(SRC_FILES))
 
